@@ -27,9 +27,9 @@ trap 'rm -rf "$STAGE"' EXIT
 CANDIDATE="$STAGE/Dead Island 2 Trainer.app"
 TEST="$STAGE/Trainer Test.app"
 mkdir -p "$CANDIDATE/Contents/MacOS" "$CANDIDATE/Contents/Resources" "$TEST/Contents/MacOS"
-FLAGS=(-arch arm64 -mmacosx-version-min=14.0 -fobjc-arc -O1 -Wall -Wextra -Werror -I"$ROOT/Sources")
+FLAGS=(-arch arm64 -mmacosx-version-min=14.0 -fobjc-arc -O1 -Wall -Wextra -Werror "-ffile-prefix-map=$ROOT=." -I"$ROOT/Sources")
 xcrun clang "${FLAGS[@]}" -dynamiclib -framework Carbon -framework AppKit -framework QuartzCore \
-    "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" "$ROOT/Sources/Runtime.m" -o "$CANDIDATE/Contents/Resources/TrainerOverlay.dylib"
+    "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" "$ROOT/Sources/Runtime.m" -install_name @rpath/TrainerOverlay.dylib -o "$CANDIDATE/Contents/Resources/TrainerOverlay.dylib"
 codesign --force --sign - --timestamp=none "$CANDIDATE/Contents/Resources/TrainerOverlay.dylib"
 xcrun clang "${FLAGS[@]}" -framework AppKit -framework Security -framework UniformTypeIdentifiers "$ROOT/Sources/Launcher.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/GameEdition.m" -o "$CANDIDATE/Contents/MacOS/Trainer"
 cp "$ROOT/Resources/Info.plist" "$CANDIDATE/Contents/Info.plist"
@@ -51,7 +51,7 @@ from pathlib import Path
 Path(sys.argv[1]).write_bytes(plistlib.dumps({'CFBundleIdentifier':'local.deadisland2.trainer-test','CFBundleExecutable':'TrainerTestHost','CFBundleName':'Trainer Overlay Metal-Test','CFBundlePackageType':'APPL','CFBundleShortVersionString':'0.6.3','LSMinimumSystemVersion':'14.0','NSPrincipalClass':'NSApplication','NSHighResolutionCapable':True}))
 PY
 xcrun clang "${FLAGS[@]}" -DDI2_OVERLAY_TEST=1 -dynamiclib -framework Carbon -framework AppKit -framework QuartzCore \
-    "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" "$ROOT/Sources/Runtime.m" -o "$STAGE/TestOverlay.dylib"
+    "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" "$ROOT/Sources/Runtime.m" -install_name @rpath/TestOverlay.dylib -o "$STAGE/TestOverlay.dylib"
 codesign --force --sign - --timestamp=none "$STAGE/TestOverlay.dylib"
 codesign --force --sign - --timestamp=none "$TEST"
 "$TEST/Contents/MacOS/TrainerTestHost" --unit-test
