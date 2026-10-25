@@ -1,0 +1,430 @@
+{
+  "profiles": [
+    {
+      "edition": "mas",
+      "uuid": "33AE24EE-5FDC-379A-BD9E-8B1BDE36B6EC",
+      "default_path": "/Applications/DeadIsland2.app"
+    },
+    {
+      "edition": "steam",
+      "uuid": "9EB36C68-45E5-3C11-B465-FFD49164B1DA",
+      "default_path": "~/Library/Application Support/Steam/steamapps/common/Dead Island 2/DeadIsland2.app"
+    }
+  ],
+  "bindings": {
+    "world": {
+      "symbol": "_GWorld",
+      "address": "0x1073e9de8"
+    },
+    "gameThreadCall": {
+      "symbol": "__Z14GameThreadCallU13block_pointerFvvEP7NSArrayb",
+      "address": "0x102b02e64"
+    },
+    "playerCharacter": {
+      "symbol": "__ZN16UGameplayStatics18GetPlayerCharacterEPK7UObjecti",
+      "address": "0x1044e0170"
+    },
+    "standalone": {
+      "symbol": "__ZN20UKismetSystemLibrary12IsStandaloneEP7UObject",
+      "address": "0x1045c503c"
+    },
+    "valid": {
+      "symbol": "__ZNK11UObjectBase19IsValidLowLevelFastEb",
+      "address": "0x102d92c98"
+    },
+    "classIsChildOf": {
+      "symbol": "__ZN18UKismetMathLibrary14ClassIsChildOfE11TSubclassOfI7UObjectES2_",
+      "address": "0x1045b7950"
+    },
+    "playerClass": {
+      "symbol": "__ZN18ADIPlayerCharacter11StaticClassEv",
+      "address": "0x1024b8e88"
+    },
+    "inventoryClass": {
+      "symbol": "__ZN21UDIInventoryComponent11StaticClassEv",
+      "address": "0x1024988f0"
+    },
+    "healthClass": {
+      "symbol": "__ZN22USimpleHealthComponent11StaticClassEv",
+      "address": "0x102769ca8"
+    },
+    "staminaClass": {
+      "symbol": "__ZN23UPlayerStaminaComponent11StaticClassEv",
+      "address": "0x10280c484"
+    },
+    "physicalSlotClass": {
+      "symbol": "__ZN13UPhysicalSlot11StaticClassEv",
+      "address": "0x1027ded2c"
+    },
+    "equippableClass": {
+      "symbol": "__ZN20UEquippableComponent11StaticClassEv",
+      "address": "0x10248ce74"
+    },
+    "rangedClass": {
+      "symbol": "__ZN22ARangedWeaponItemActor11StaticClassEv",
+      "address": "0x102855b98"
+    },
+    "modulesClass": {
+      "symbol": "__ZN29URangedWeaponModulesComponent11StaticClassEv",
+      "address": "0x10285bb3c"
+    },
+    "clipClass": {
+      "symbol": "__ZN20UClipAmmoHandlerBase11StaticClassEv",
+      "address": "0x10238c018"
+    },
+    "component": {
+      "symbol": "__ZNK6AActor19GetComponentByClassE11TSubclassOfI15UActorComponentE",
+      "address": "0x1041bce18"
+    },
+    "inventory": {
+      "symbol": "__ZNK18ADIPlayerCharacter12GetInventoryEv",
+      "address": "0x101e896cc"
+    },
+    "count": {
+      "symbol": "__ZNK19UInventoryComponent21GetItemArchetypeCountEPK14UItemArchetype",
+      "address": "0x105129ec4"
+    },
+    "addCash": {
+      "symbol": "__ZN21UDIInventoryComponent7AddCashEi",
+      "address": "0x101d7ff4c"
+    },
+    "name": {
+      "symbol": "__ZN5FNameC1EPKDs9EFindName",
+      "address": "0x102bdb344"
+    },
+    "addGod": {
+      "symbol": "__ZN22USimpleHealthComponent16AddGodModeReasonE5FName",
+      "address": "0x1018003cc"
+    },
+    "removeGod": {
+      "symbol": "__ZN22USimpleHealthComponent19RemoveGodModeReasonE5FName",
+      "address": "0x1018003f8"
+    },
+    "fillHealth": {
+      "symbol": "__ZN22USimpleHealthComponent19SetHealthAsFractionEf",
+      "address": "0x1017ffe24"
+    },
+    "stamina": {
+      "symbol": "__ZNK17UStaminaComponent10GetStaminaEv",
+      "address": "0x101c82024"
+    },
+    "maxStamina": {
+      "symbol": "__ZNK17UStaminaComponent13GetMaxStaminaEv",
+      "address": "0x101c853e4"
+    },
+    "setStamina": {
+      "symbol": "__ZN17UStaminaComponent10SetStaminaEf",
+      "address": "0x101c84014"
+    },
+    "weakAssign": {
+      "symbol": "__ZN14FWeakObjectPtraSEPK7UObject",
+      "address": "0x102dba090"
+    },
+    "weakGet": {
+      "symbol": "__ZNK14FWeakObjectPtr3GetEv",
+      "address": "0x102dba274"
+    },
+    "ammoHandler": {
+      "symbol": "__ZNK29URangedWeaponModulesComponent22GetSelectedAmmoHandlerEv",
+      "address": "0x101c3a5a4"
+    },
+    "ammo": {
+      "symbol": "__ZNK20UClipAmmoHandlerBase14GetCurrentAmmoEv",
+      "address": "0x101c49b28"
+    },
+    "capacity": {
+      "symbol": "__ZNK20UClipAmmoHandlerBase15GetAmmoCapacityEv",
+      "address": "0x101c49b68"
+    },
+    "setAmmo": {
+      "symbol": "__ZN20UClipAmmoHandlerBase14RequestSetAmmoEi",
+      "address": "0x101c4a578"
+    },
+    "playerController": {
+      "symbol": "__ZN16UGameplayStatics19GetPlayerControllerEPK7UObjecti",
+      "address": "0x1044dfffc"
+    },
+    "meleeClass": {
+      "symbol": "__ZN21AMeleeWeaponItemActor11StaticClassEv",
+      "address": "0x1026e88d4"
+    },
+    "meleeAttributesClass": {
+      "symbol": "__ZN31UMeleeWeaponAttributesComponent11StaticClassEv",
+      "address": "0x1026e581c"
+    },
+    "attributeClass": {
+      "symbol": "__ZN18UAttributeInstance11StaticClassEv",
+      "address": "0x10236fd00"
+    },
+    "damageableClass": {
+      "symbol": "__ZN20UDamageableComponent11StaticClassEv",
+      "address": "0x10245bfa8"
+    },
+    "furyClass": {
+      "symbol": "__ZN20UFuryValuesComponent11StaticClassEv",
+      "address": "0x10252b47c"
+    },
+    "throwClass": {
+      "symbol": "__ZN24UQuickThrowSlotComponent11StaticClassEv",
+      "address": "0x1028497d4"
+    },
+    "progressionClass": {
+      "symbol": "__ZN27UPlayerProgressionComponent11StaticClassEv",
+      "address": "0x102806a24"
+    },
+    "levelsClass": {
+      "symbol": "__ZN24UPlayerProgressionLevels11StaticClassEv",
+      "address": "0x1028076fc"
+    },
+    "spreadClass": {
+      "symbol": "__ZN22UStandardSpreadHandler11StaticClassEv",
+      "address": "0x1028aba04"
+    },
+    "recoilClass": {
+      "symbol": "__ZN22UStandardRecoilHandler11StaticClassEv",
+      "address": "0x10285e548"
+    },
+    "addDurability": {
+      "symbol": "__ZN21AMeleeWeaponItemActor27AddInfiniteDurabilityReasonE5FName",
+      "address": "0x101dddec8"
+    },
+    "removeDurability": {
+      "symbol": "__ZN21AMeleeWeaponItemActor30RemoveInfiniteDurabilityReasonE5FName",
+      "address": "0x101dddef4"
+    },
+    "repair": {
+      "symbol": "__ZN21AMeleeWeaponItemActor34AuthoritySetCurrentDurabilityToMaxEv",
+      "address": "0x101ddcf70"
+    },
+    "durabilityLoss": {
+      "symbol": "__ZNK21AMeleeWeaponItemActor20DurabilityLossPerHitEv",
+      "address": "0x101dd7a58"
+    },
+    "setIncomingDamage": {
+      "symbol": "__ZN20UDamageableComponent25SetGlobalDamageMultiplierEf",
+      "address": "0x1017e1fd0"
+    },
+    "getGameSpeed": {
+      "symbol": "__ZN16UGameplayStatics21GetGlobalTimeDilationEPK7UObject",
+      "address": "0x1044e059c"
+    },
+    "setGameSpeed": {
+      "symbol": "__ZN16UGameplayStatics21SetGlobalTimeDilationEPK7UObjectf",
+      "address": "0x1044e05e4"
+    },
+    "damageAttribute": {
+      "symbol": "__ZN31UMeleeWeaponAttributesComponent26GetDamageAttributeInstanceEv",
+      "address": "0x101b9217c"
+    },
+    "forceAttribute": {
+      "symbol": "__ZN31UMeleeWeaponAttributesComponent25GetForceAttributeInstanceEv",
+      "address": "0x101b921cc"
+    },
+    "getAttribute": {
+      "symbol": "__ZNK18UAttributeInstance18GetCurrentRawValueEv",
+      "address": "0x10168d36c"
+    },
+    "setAttribute": {
+      "symbol": "__ZN18UAttributeInstance18SetCurrentRawValueEf",
+      "address": "0x10168d374"
+    },
+    "spreadHandler": {
+      "symbol": "__ZNK29URangedWeaponModulesComponent24GetSelectedSpreadHandlerEv",
+      "address": "0x101c3e5a0"
+    },
+    "recoilHandler": {
+      "symbol": "__ZNK29URangedWeaponModulesComponent24GetSelectedRecoilHandlerEv",
+      "address": "0x101c3fda8"
+    },
+    "resetCurveballs": {
+      "symbol": "__ZN24UQuickThrowSlotComponent17ResetAllCooldownsEv",
+      "address": "0x101c334d0"
+    },
+    "setInfiniteFury": {
+      "symbol": "__ZN20UFuryValuesComponent38ServerSetIsInfiniteFury_ImplementationEb",
+      "address": "0x101ec69a0"
+    },
+    "getFury": {
+      "symbol": "__ZN20UFuryValuesComponent14GetCurrentFuryEv",
+      "address": "0x101ec5220"
+    },
+    "addFury": {
+      "symbol": "__ZN20UFuryValuesComponent13IncrementFuryEfP15UFuryGainSource",
+      "address": "0x101ec6468"
+    },
+    "removeCash": {
+      "symbol": "__ZN21UDIInventoryComponent10RemoveCashEi",
+      "address": "0x101d8008c"
+    },
+    "getXP": {
+      "symbol": "__ZNK27UPlayerProgressionComponent5GetXPEv",
+      "address": "0x101ef4d10"
+    },
+    "getLevel": {
+      "symbol": "__ZNK27UPlayerProgressionComponent8GetLevelEv",
+      "address": "0x10223eb80"
+    },
+    "maxLevel": {
+      "symbol": "__ZNK27UPlayerProgressionComponent11GetMaxLevelEv",
+      "address": "0x101ef5dc0"
+    },
+    "xpForLevel": {
+      "symbol": "__ZNK24UPlayerProgressionLevels13GetXPForLevelEi",
+      "address": "0x101ef4ea0"
+    },
+    "addXP": {
+      "symbol": "__ZN27UPlayerProgressionComponent5AddXPEi5FName",
+      "address": "0x101ef53a0"
+    },
+    "ignorePlayers": {
+      "symbol": "__ZN10AAIManager13IgnorePlayersE",
+      "address": "0x1072c07b0"
+    },
+    "aiManager": {
+      "symbol": "__ZN10AAIManager12GetAIManagerEP7UObject",
+      "address": "0x101537a78"
+    },
+    "aiManagerClass": {
+      "symbol": "__ZN10AAIManager11StaticClassEv",
+      "address": "0x10237256c"
+    },
+    "playerStateClass": {
+      "symbol": "__ZN12APlayerState11StaticClassEv",
+      "address": "0x104c959ec"
+    },
+    "updateIgnorePlayers": {
+      "symbol": "__ZN10AAIManager19UpdateIgnorePlayersEv",
+      "address": "0x101538e3c"
+    },
+    "setIgnorePlayer": {
+      "symbol": "__ZN10AAIManager15SetIgnorePlayerERK6TArrayI7FString22TSizedDefaultAllocatorILi32EEE",
+      "address": "0x101538498"
+    },
+    "modifiableClass": {
+      "symbol": "__ZN26UModifiableValuesComponent11StaticClassEv",
+      "address": "0x102750614"
+    },
+    "movementDefinitionClass": {
+      "symbol": "__ZN26UModifiableValueDefinition11StaticClassEv",
+      "address": "0x102754d6c"
+    },
+    "currentMovementValue": {
+      "symbol": "__ZNK26UModifiableValuesComponent15GetCurrentValueEPK26UModifiableValueDefinitionRf",
+      "address": "0x1022ad950"
+    },
+    "addMovementModifier": {
+      "symbol": "__ZN26UModifiableValuesComponent11AddModifierEPK26UModifiableValueDefinition5FNamef24EDuplicateModifierPolicyfb",
+      "address": "0x1022ac198"
+    },
+    "removeMovementModifier": {
+      "symbol": "__ZN26UModifiableValuesComponent14RemoveModifierE5FGuidf",
+      "address": "0x1022abc1c"
+    },
+    "updateMovementModifier": {
+      "symbol": "__ZN26UModifiableValuesComponent22UpdateExistingModifierEPK26UModifiableValueDefinition5FGuidf",
+      "address": "0x1022ae5f4"
+    },
+    "containerClass": {
+      "symbol": "__ZN27UInventoryCategoryContainer11StaticClassEv",
+      "address": "0x102497d88"
+    },
+    "categoryClass": {
+      "symbol": "__ZN18UInventoryCategory11StaticClassEv",
+      "address": "0x1051e3260"
+    },
+    "itemActorClass": {
+      "symbol": "__ZN10AItemActor11StaticClassEv",
+      "address": "0x1024680d8"
+    },
+    "archetypeClass": {
+      "symbol": "__ZN14UItemArchetype11StaticClassEv",
+      "address": "0x102467ef0"
+    },
+    "nameString": {
+      "symbol": "__ZNK5FName8ToStringEPDsj",
+      "address": "0x102bdcdc0"
+    },
+    "addItem": {
+      "symbol": "__ZN19UInventoryComponent18AddItemByArchetypeEPK14UItemArchetypeib",
+      "address": "0x1051270c8"
+    },
+    "recipeClass": {
+      "symbol": "__ZN15UCraftingRecipe11StaticClassEv",
+      "address": "0x102458eac"
+    },
+    "ingredientsClass": {
+      "symbol": "__ZN20UCraftingIngredients11StaticClassEv",
+      "address": "0x1024588c8"
+    },
+    "objectsOfClass": {
+      "symbol": "__Z17GetObjectsOfClassPK6UClassR6TArrayIP7UObject22TSizedDefaultAllocatorILi32EEEb12EObjectFlags20EInternalObjectFlags",
+      "address": "0x102db5da4"
+    },
+    "freeMemory": {
+      "symbol": "__ZN7FMemory4FreeEPv",
+      "address": "0x102a57e08"
+    },
+    "zeroCraftingCost": {
+      "symbol": "__ZNK20UCraftingIngredients11GetCashCostERK19FItemUpgradeContext",
+      "address": "0x10245c674"
+    },
+    "controllerClass": {
+      "symbol": "__ZN17APlayerController11StaticClassEv",
+      "address": "0x101312b4c"
+    },
+    "localPlayerClass": {
+      "symbol": "__ZN12ULocalPlayer11StaticClassEv",
+      "address": "0x104c0d390"
+    },
+    "viewportClass": {
+      "symbol": "__ZN19UGameViewportClient11StaticClassEv",
+      "address": "0x104b1bda8"
+    },
+    "worldViewport": {
+      "symbol": "__ZNK6UWorld15GetGameViewportEv",
+      "address": "0x104a800c0"
+    },
+    "inputUIOnly": {
+      "symbol": "__ZN23UWidgetBlueprintLibrary21SetInputMode_UIOnlyExEP17APlayerControllerP7UWidget14EMouseLockMode",
+      "address": "0x103f46018"
+    },
+    "inputGameOnly": {
+      "symbol": "__ZN23UWidgetBlueprintLibrary21SetInputMode_GameOnlyEP17APlayerController",
+      "address": "0x103f4654c"
+    }
+  },
+  "crafting_tables": [
+    {
+      "symbol": "__ZTV20UCraftingIngredients",
+      "address": "0x1065321d0",
+      "size": 600
+    },
+    {
+      "symbol": "__ZTV31UCraftingIngredients_FixedValue",
+      "address": "0x1065324b8",
+      "size": 600
+    },
+    {
+      "symbol": "__ZTV31UItemUpgradeCraftingIngredients",
+      "address": "0x1066a1c28",
+      "size": 600
+    }
+  ],
+  "shared_sections": {
+    "__TEXT,__text": {
+      "address": "0x10000d978",
+      "size": 86199912,
+      "sha256": "b72301448a673b03dccb479390917de69ba9c32e415d0578e58c07828c772803"
+    },
+    "__DATA_CONST,__const": {
+      "address": "0x105fca890",
+      "size": 14551976,
+      "sha256": "5f4940b2485386ca88b654726b119c798c8ec6b277dc23bdd7e7e0e31227ded1"
+    },
+    "__DATA,__data": {
+      "address": "0x106dbc4a0",
+      "size": 1915352,
+      "sha256": "9f99e5a0cfad5587375d695f3263e406639846522a7faeaf7df5dc6bd778d417"
+    }
+  }
+}
