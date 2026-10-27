@@ -4,6 +4,7 @@
 #import <os/log.h>
 #import "OverlaySettings.h"
 #import "GameEdition.h"
+#import "LauncherView.h"
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 static NSString *const uncutPath = @"/Applications/Dead Island 2 Uncut.app";
@@ -40,7 +41,7 @@ static BOOL uncutAvailable(void) {
 @property(nonatomic, strong) NSWindow *window;
 @property(nonatomic, strong) NSTextField *status;
 @property(nonatomic, strong) NSButton *start;
-@property(nonatomic, strong) NSButton *uncut;
+@property(nonatomic, strong) NSButton *startUncut;
 @property(nonatomic, strong) NSRunningApplication *game;
 @property(nonatomic, copy) NSString *token;
 @property(nonatomic, strong) NSTimer *processTimer;
@@ -49,10 +50,11 @@ static BOOL uncutAvailable(void) {
 @property(nonatomic, copy) NSDictionary *options;
 @property(nonatomic, strong) id settingsObserver;
 @property(nonatomic) DI2GameEdition edition;
-@property(nonatomic, strong) NSPopUpButton *editionPicker;
+@property(nonatomic, strong) NSSegmentedControl *editionPicker;
+@property(nonatomic, strong) DI2LauncherView *launcherView;
+@property(nonatomic, strong) NSWindow *settingsWindow;
 @property(nonatomic, strong) NSButton *chooseGame, *steamButton;
 @property(nonatomic, strong) NSTextField *gameLocation;
-@property(nonatomic) BOOL masUncutWanted;
 @end
 
 @implementation TrainerDelegate
@@ -65,75 +67,11 @@ static BOOL uncutAvailable(void) {
     NSMenuItem *application = [NSMenuItem new];
     [menu addItem:application];
     NSMenu *applicationMenu = [NSMenu new];
+    NSMenuItem *settings=[applicationMenu addItemWithTitle:@"Overlay-Einstellungen …" action:@selector(openSettings:) keyEquivalent:@","]; settings.target=self;
     [applicationMenu addItemWithTitle:@"Trainer beenden" action:@selector(terminate:) keyEquivalent:@"q"];
     application.submenu = applicationMenu;
     NSApp.mainMenu = menu;
-    self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 620, 660)
-        styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
-        backing:NSBackingStoreBuffered defer:NO];
-    self.window.title = @"Dead Island 2 Trainer";
-    self.window.releasedWhenClosed = NO;
-    NSTextField *title = [NSTextField labelWithString:@"Dead Island 2 Trainer"];
-    title.font = [NSFont boldSystemFontOfSize:26];
-    NSTextField *subtitle = [NSTextField wrappingLabelWithString:@"Version 0.6.3 · Steam und Mac App Store · Apple Silicon"];
-    self.editionPicker=[[NSPopUpButton alloc]initWithFrame:NSZeroRect pullsDown:NO];
-    [self.editionPicker addItemsWithTitles:@[@"Mac App Store",@"Steam"]];
-    [self.editionPicker selectItemAtIndex:self.edition==DI2EditionSteam ? 1 : 0];
-    self.editionPicker.target=self; self.editionPicker.action=@selector(changeEdition:);
-    self.editionPicker.accessibilityLabel=@"Spiele-Version";
-    self.chooseGame=[NSButton buttonWithTitle:@"Spiele-App wählen …" target:self action:@selector(chooseGameApp:)];
-    self.steamButton=[NSButton buttonWithTitle:@"Steam öffnen" target:self action:@selector(openSteam:)];
-    NSStackView *editionRow=[NSStackView stackViewWithViews:@[[NSTextField labelWithString:@"Spiel auswählen"],self.editionPicker,self.chooseGame,self.steamButton]];
-    editionRow.spacing=10;
-    self.gameLocation=[NSTextField labelWithString:editionPath(self.edition)];
-    self.gameLocation.font=[NSFont systemFontOfSize:11];self.gameLocation.lineBreakMode=NSLineBreakByTruncatingMiddle;
-    self.gameLocation.textColor=NSColor.secondaryLabelColor;
-    NSTextField *details = [NSTextField wrappingLabelWithString:@"⌘ + ^ öffnet das Overlay mit freier Maus; erneut drücken oder Esc gibt die Spielsteuerung zurück. Aktive Cheats bleiben an.\nF1 Gottmodus · F2 Ausdauer · F3 Reserve · F4/F5 Geld\nF6–F11 weitere Schalter · F12 alles aus · Weitere Tasten: ⇧/⌥ + F-Taste.\nNur Einzelspieler. Geld, XP und ergänzte Gegenstände werden vom Spiel gespeichert."];
-    details.font = [NSFont systemFontOfSize:13];
-    self.uncut = [NSButton checkboxWithTitle:@"Vorhandenen Uncut-Starthelfer mitverwenden" target:nil action:nil];
-    self.uncut.enabled = uncutAvailable();
-    self.uncut.state = self.uncut.enabled ? NSControlStateValueOn : NSControlStateValueOff;
-    self.masUncutWanted=self.uncut.enabled;
-    self.showOverlay=[NSButton checkboxWithTitle:@"Overlay anzeigen – Trainer bleibt beim Verbergen aktiv" target:self action:@selector(changeOverlayOptions:)];
-    self.showBadge=[NSButton checkboxWithTitle:@"Beim Verbergen ein kleines Trainer-Symbol anzeigen" target:self action:@selector(changeOverlayOptions:)];
-    self.allowDragging=[NSButton checkboxWithTitle:@"Mit der Maus verschiebbar: Titelleiste im Overlay ziehen" target:self action:@selector(changeOverlayOptions:)];
-    self.mouseInput=[NSButton checkboxWithTitle:@"Maus im sichtbaren Overlay freigeben (⌘⌥ + ^ zum Umschalten)" target:self action:@selector(changeOverlayOptions:)];
-    self.position=[[NSPopUpButton alloc]initWithFrame:NSZeroRect pullsDown:NO];
-    NSArray *positionNames=@[@"Oben links",@"Oben rechts",@"Unten links",@"Unten rechts",@"Mitte",@"Frei / letzte gezogene Position"];
-    NSArray *positionKeys=@[@"top-left",@"top-right",@"bottom-left",@"bottom-right",@"center",@"free"];
-    [self.position addItemsWithTitles:positionNames];
-    for (NSUInteger i=0;i<positionKeys.count;i++) self.position.itemArray[i].representedObject=positionKeys[i];
-    self.position.target=self; self.position.action=@selector(changeOverlayOptions:);
-    self.position.accessibilityLabel=@"Overlay-Position im Spielfenster";
-    NSButton *reset=[NSButton buttonWithTitle:@"Position zurücksetzen" target:self action:@selector(resetOverlayPosition:)];
-    NSStackView *positionRow=[NSStackView stackViewWithViews:@[[NSTextField labelWithString:@"Position"],self.position,reset]];
-    positionRow.spacing=10;
-    NSTextField *settingsTitle=[NSTextField labelWithString:@"Overlay-Einstellungen"];
-    settingsTitle.font=[NSFont boldSystemFontOfSize:14];
-    NSTextField *settingsHint=[NSTextField wrappingLabelWithString:@"Position und Größe werden gespeichert. Änderungen gelten auch für eine mit dieser Launcher-Sitzung gestartete Spielinstanz."];
-    settingsHint.font=[NSFont systemFontOfSize:11]; settingsHint.textColor=NSColor.secondaryLabelColor;
-    [self updateOverlayControls];
-    self.start = [NSButton buttonWithTitle:@"Spiel mit Trainer starten" target:self action:@selector(startGame:)];
-    self.start.bezelStyle = NSBezelStyleRounded;
-    self.start.keyEquivalent = @"\r";
-    self.status = [NSTextField wrappingLabelWithString:@"Bereit. Spiele-Dateien werden nicht verändert."];
-    self.status.font = [NSFont systemFontOfSize:12];
-    self.status.textColor = NSColor.secondaryLabelColor;
-    NSStackView *stack = [NSStackView stackViewWithViews:@[title,subtitle,editionRow,self.gameLocation,details,settingsTitle,self.showOverlay,self.showBadge,self.mouseInput,self.allowDragging,positionRow,settingsHint,self.uncut,self.start,self.status]];
-    stack.orientation = NSUserInterfaceLayoutOrientationVertical;
-    stack.alignment = NSLayoutAttributeLeading;
-    stack.spacing = 13;
-    stack.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.window.contentView addSubview:stack];
-    for (NSTextField *text in @[details,settingsHint,self.status,self.gameLocation]) {
-        text.preferredMaxLayoutWidth=564;
-        [text.widthAnchor constraintEqualToConstant:564].active=YES;
-    }
-    [NSLayoutConstraint activateConstraints:@[
-        [stack.leadingAnchor constraintEqualToAnchor:self.window.contentView.leadingAnchor constant:28],
-        [stack.trailingAnchor constraintEqualToAnchor:self.window.contentView.trailingAnchor constant:-28],
-        [stack.topAnchor constraintEqualToAnchor:self.window.contentView.topAnchor constant:24]
-    ]];
+    [self buildLauncher];
     [self refreshInstallation];
     [self.window center];
     [self.window makeKeyAndOrderFront:nil];
@@ -153,24 +91,69 @@ static BOOL uncutAvailable(void) {
                 : @"Trainer aktiv · Overlay verborgen · Cheats/F-Tasten bleiben an · ⌘ + ^ zum Anzeigen.";
         }];
 }
+- (void)buildLauncher {
+    self.window=[[NSWindow alloc]initWithContentRect:NSMakeRect(0,0,520,564)
+        styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskFullSizeContentView
+        backing:NSBackingStoreBuffered defer:NO];
+    self.window.title=@"Dead Island 2 Trainer"; self.window.releasedWhenClosed=NO;
+    self.window.titleVisibility=NSWindowTitleHidden; self.window.titlebarAppearsTransparent=YES;
+    self.window.movableByWindowBackground=YES; self.window.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+    self.window.backgroundColor=[NSColor colorWithWhite:0.075 alpha:1];
+    NSString *version=[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"0.6.4";
+    self.launcherView=[[DI2LauncherView alloc]initWithFrame:NSMakeRect(0,0,520,564) version:version];
+    self.window.contentView=self.launcherView;
+    self.editionPicker=self.launcherView.editionPicker; self.editionPicker.target=self; self.editionPicker.action=@selector(changeEdition:);
+    self.chooseGame=self.launcherView.chooseGame; self.chooseGame.target=self; self.chooseGame.action=@selector(chooseGameApp:);
+    self.steamButton=self.launcherView.steamButton; self.steamButton.target=self; self.steamButton.action=@selector(openSteam:);
+    self.start=self.launcherView.start; self.start.target=self; self.start.action=@selector(startGame:);
+    self.startUncut=self.launcherView.uncutStart; self.startUncut.target=self; self.startUncut.action=@selector(startUncutGame:);
+    self.launcherView.settingsButton.target=self; self.launcherView.settingsButton.action=@selector(openSettings:);
+    self.status=self.launcherView.status;
+    self.settingsWindow=[[NSWindow alloc]initWithContentRect:NSMakeRect(0,0,620,356)
+        styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable backing:NSBackingStoreBuffered defer:NO];
+    self.settingsWindow.title=@"Overlay-Einstellungen"; self.settingsWindow.releasedWhenClosed=NO;
+    self.settingsWindow.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+    self.showOverlay=[NSButton checkboxWithTitle:@"Overlay anzeigen – beim Verbergen bleiben Cheats aktiv" target:self action:@selector(changeOverlayOptions:)];
+    self.showBadge=[NSButton checkboxWithTitle:@"Beim Verbergen ein kleines Trainer-Symbol anzeigen" target:self action:@selector(changeOverlayOptions:)];
+    self.mouseInput=[NSButton checkboxWithTitle:@"Maus im sichtbaren Overlay freigeben (⌘⌥ + ^)" target:self action:@selector(changeOverlayOptions:)];
+    self.allowDragging=[NSButton checkboxWithTitle:@"Overlay mit der Maus verschieben: Titelleiste ziehen" target:self action:@selector(changeOverlayOptions:)];
+    self.position=[[NSPopUpButton alloc]initWithFrame:NSZeroRect pullsDown:NO];
+    [self.position addItemsWithTitles:@[@"Oben links",@"Oben rechts",@"Unten links",@"Unten rechts",@"Mitte",@"Frei / letzte Position"]];
+    NSArray *keys=@[@"top-left",@"top-right",@"bottom-left",@"bottom-right",@"center",@"free"];
+    for(NSUInteger i=0;i<keys.count;i++)self.position.itemArray[i].representedObject=keys[i];
+    self.position.target=self; self.position.action=@selector(changeOverlayOptions:);
+    self.position.accessibilityLabel=@"Overlay-Position im Spielfenster";
+    NSButton *reset=[NSButton buttonWithTitle:@"Zurücksetzen" target:self action:@selector(resetOverlayPosition:)];
+    NSStackView *positionRow=[NSStackView stackViewWithViews:@[[NSTextField labelWithString:@"Position"],self.position,reset]]; positionRow.spacing=10;
+    NSTextField *hint=[NSTextField wrappingLabelWithString:@"Anzeigeoptionen werden gespeichert und an die mit dieser Launcher-Sitzung gestartete Spielinstanz übertragen."];
+    hint.font=[NSFont systemFontOfSize:11]; hint.textColor=NSColor.secondaryLabelColor;
+    self.gameLocation=[NSTextField labelWithString:editionPath(self.edition)];
+    self.gameLocation.font=[NSFont systemFontOfSize:10]; self.gameLocation.textColor=NSColor.secondaryLabelColor;
+    self.gameLocation.lineBreakMode=NSLineBreakByTruncatingMiddle;
+    NSButton *done=[NSButton buttonWithTitle:@"Fertig" target:self action:@selector(closeSettings:)]; done.keyEquivalent=@"\r";
+    NSStackView *stack=[NSStackView stackViewWithViews:@[self.showOverlay,self.showBadge,self.mouseInput,self.allowDragging,positionRow,hint,self.gameLocation,done]];
+    stack.orientation=NSUserInterfaceLayoutOrientationVertical; stack.alignment=NSLayoutAttributeLeading; stack.spacing=15; stack.translatesAutoresizingMaskIntoConstraints=NO;
+    [self.settingsWindow.contentView addSubview:stack];
+    for(NSTextField *label in @[hint,self.gameLocation]){label.preferredMaxLayoutWidth=564;[label.widthAnchor constraintEqualToConstant:564].active=YES;}
+    [NSLayoutConstraint activateConstraints:@[[stack.leadingAnchor constraintEqualToAnchor:self.settingsWindow.contentView.leadingAnchor constant:28],[stack.trailingAnchor constraintEqualToAnchor:self.settingsWindow.contentView.trailingAnchor constant:-28],[stack.topAnchor constraintEqualToAnchor:self.settingsWindow.contentView.topAnchor constant:24]]];
+    [self updateOverlayControls];
+}
+- (void)openSettings:(id)sender { (void)sender; if(!self.settingsWindow.isVisible)[self.settingsWindow center];[self.settingsWindow makeKeyAndOrderFront:nil]; }
+- (void)closeSettings:(id)sender { (void)sender; [self.settingsWindow orderOut:nil]; }
 - (void)refreshInstallation {
     self.gameLocation.stringValue=editionPath(self.edition);self.gameLocation.toolTip=self.gameLocation.stringValue;
     BOOL running=self.game && !self.game.terminated;
     self.editionPicker.enabled=!running;self.chooseGame.enabled=!running;
     self.steamButton.enabled=self.edition==DI2EditionSteam;
-    self.uncut.toolTip=@"Der zusätzliche Uncut-Starthelfer wird ausschließlich bei der Mac-App-Store-Version mitgeladen.";
-    self.uncut.enabled=self.edition==DI2EditionMAS && uncutAvailable();
-    self.uncut.state=self.uncut.enabled && self.masUncutWanted ? NSControlStateValueOn : NSControlStateValueOff;
     NSError *error=nil;NSDictionary *installation=DI2InspectGame(editionPath(self.edition),self.edition,&error);
-    self.start.enabled=!running && installation!=nil;
+    [self.launcherView showEdition:self.edition found:installation!=nil running:running uncutAvailable:uncutAvailable() path:editionPath(self.edition)];
     if (!running) self.status.stringValue=installation
-        ? [NSString stringWithFormat:@"%@ %@ erkannt. Beide Spiele-Apps bleiben unverändert.",DI2EditionTitle(self.edition),installation[@"version"]]
+        ? @""
         : error.localizedDescription;
 }
 - (void)changeEdition:(id)sender {
     (void)sender;
-    if (self.edition==DI2EditionMAS) self.masUncutWanted=self.uncut.state==NSControlStateValueOn;
-    self.edition=self.editionPicker.indexOfSelectedItem==1 ? DI2EditionSteam : DI2EditionMAS;
+    self.edition=self.editionPicker.selectedSegment==1 ? DI2EditionSteam : DI2EditionMAS;
     [NSUserDefaults.standardUserDefaults setObject:DI2EditionKey(self.edition) forKey:@"GameEdition"];
     [self refreshInstallation];
 }
@@ -229,8 +212,10 @@ static BOOL uncutAvailable(void) {
     NSMutableDictionary *options=[self.options mutableCopy]; options[@"x"]=@0; options[@"y"]=@0;
     self.options=options; [self.position selectItemAtIndex:0]; [self changeOverlayOptions:nil];
 }
-- (void)startGame:(id)sender {
-    (void)sender;
+- (void)startGame:(id)sender { (void)sender; [self launchGameWithUncut:NO]; }
+- (void)startUncutGame:(id)sender { (void)sender; [self launchGameWithUncut:YES]; }
+- (void)launchGameWithUncut:(BOOL)useUncut {
+    if(useUncut && self.edition!=DI2EditionMAS) { self.status.stringValue=@"Der zusätzliche Uncut-Helfer ist nur für die Mac-App-Store-Version vorgesehen."; return; }
     NSError *error=nil;NSDictionary *installation=DI2InspectGame(editionPath(self.edition),self.edition,&error);
     if (!installation) { self.status.stringValue=error.localizedDescription; return; }
     NSString *gamePath=installation[@"path"];
@@ -249,7 +234,7 @@ static BOOL uncutAvailable(void) {
     NSString *library = [NSBundle.mainBundle pathForResource:@"TrainerOverlay" ofType:@"dylib"];
     if (!library) { self.status.stringValue = @"Das Overlay-Modul fehlt."; return; }
     NSMutableArray *libraries = [NSMutableArray arrayWithObject:library];
-    if (self.edition==DI2EditionMAS && self.uncut.state == NSControlStateValueOn) {
+    if (useUncut) {
         if (!uncutAvailable()) { self.status.stringValue = @"Der gewählte vorhandene Uncut-Starthelfer ist nicht verfügbar."; return; }
         [libraries addObject:[uncutPath stringByAppendingPathComponent:@"Contents/Resources/RuntimeIdentity.dylib"]];
     }
@@ -266,7 +251,7 @@ static BOOL uncutAvailable(void) {
     } mutableCopy];
     if (self.edition==DI2EditionSteam) { environment[@"SteamAppId"]=@"934700";environment[@"SteamGameId"]=@"934700"; }
     configuration.environment=environment;
-    self.start.enabled = NO;
+    self.start.enabled = NO; self.startUncut.enabled=NO;
     self.editionPicker.enabled=NO;self.chooseGame.enabled=NO;
     self.status.stringValue = @"Spielstart wird angefordert …";
     [NSWorkspace.sharedWorkspace openApplicationAtURL:[NSURL fileURLWithPath:gamePath]
@@ -278,6 +263,7 @@ static BOOL uncutAvailable(void) {
                     return;
                 }
                 self.game = application;
+                [self refreshInstallation];
                 self.status.stringValue = [NSString stringWithFormat:@"Spiel gestartet · PID %d · Overlay %@ · ⌘ + ^", application.processIdentifier,[self.options[@"visible"] boolValue] ? @"sichtbar" : @"verborgen"];
                 [self.processTimer invalidate];
                 self.processTimer = [NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer) {

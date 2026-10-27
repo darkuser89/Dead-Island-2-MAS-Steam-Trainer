@@ -2,13 +2,25 @@
 
 <img src="Resources/AppIcon.png" width="128" height="128" alt="Trainer-Icon mit Schädel und orangefarbenem Schalter">
 
-Externer Einzelspieler-Trainer **0.6.3** für **Dead Island 2 0.6.4** auf
+Externer Einzelspieler-Trainer **0.6.4** für **Dead Island 2 0.6.4** auf
 Apple Silicon. Unterstützt die Mac-App-Store- und Steam-Version mit einem
 kompakten Ingame-Overlay und 26 Bedienelementen.
 
 Die Original-Spiele-Apps bleiben unverändert. Das Overlay läuft im gestarteten
 Spielprozess; Geld, XP, Reparaturen und Inventarergänzungen können vom Spiel
 normal gespeichert werden. Der Trainer ist kein Save-Editor.
+
+## Launcher
+
+Die Hauptansicht zeigt **Dead Island 2**, die segmentierte Auswahl **Mac App Store /
+Steam**, die gefundene Installation mit Spielsymbol und einen großen orangefarbenen
+Startknopf sowie einen zweiten roten Knopf **Spiel Uncut mit Trainer starten**.
+Der orange Knopf lädt ausschließlich den Trainer. Der rote lädt zusätzlich den
+vorhandenen externen Uncut-Helfer und ist nur bei MAS mit verfügbarem Helfer aktiv.
+Über **Ändern …** wird die zur ausgewählten Edition gehörende App
+zugeordnet. Das **Zahnrad** oder **⌘ + ,** öffnet die vorhandenen Overlay-Optionen
+und Positionsvorgaben in einem eigenen Fenster.
+Der Steam-Client bleibt über **Steam öffnen** in der Steam-Spielkarte erreichbar.
 
 ## Voraussetzungen
 
@@ -58,7 +70,7 @@ Vor einem normalen Ersatzbuild laufende Trainer-, Spiel- und Testinstanzen
 regulär schließen. `--update-only` verändert bereits geladene Module nicht.
 Eine neue Overlay-Version wird erst beim nächsten regulären Spielstart über
 den Trainer geladen. Temporäre Austauschbestände werden nach dem Build entfernt;
-die neueste App und `OverlayPreview.png` bleiben im separaten Buildordner.
+die neueste App sowie `OverlayPreview.png` und `LauncherPreview.png` bleiben im separaten Buildordner.
 
 ## Spiel auswählen und starten
 
@@ -80,7 +92,8 @@ unverändert.
 
 Ein bereits installierter externer Helfer unter
 `/Applications/Dead Island 2 Uncut.app` kann optional **nur bei MAS** mitgeladen
-werden. Er ist nicht enthalten, wird nicht benötigt und wird nicht verändert.
+werden, indem der rote Startknopf gewählt wird. Er ist nicht enthalten und wird
+nicht verändert; für den normalen Trainer-Start wird er nicht benötigt.
 Der Trainer allein ändert keine USK-Einstellung und verspricht keine iCloud-Funktion.
 
 ## Overlay bedienen
@@ -171,7 +184,8 @@ F12 bleiben unabhängig davon verfügbar.
 
 Der Build prüft synthetisch unter anderem alle 26 Anbindungen, Wiederherstellung,
 Waffen- und Besitzerwechsel, tote Weak-Referenzen, numerische Grenzen,
-XP-Rückkopplung, Gebietswechsel, Warteschlange und Netzwerksperre. UI-Tests prüfen
+XP-Rückkopplung, Gebietswechsel, Warteschlange und Netzwerksperre. Launcher-Tests prüfen beide Store-Auswahlen, fehlende/laufende Installationen,
+Start-/Einstellungsaktionen und kompakte Abmessungen ohne Spielstart. UI-Tests prüfen
 Hotkeys, alle 26 Mausaktionen in verschiedenen Größen/Positionen, Zahlenfelder,
 Ziehen, Verbergen und Cursor-Wiederherstellung. Editionsprüfungen verwenden
 selbst erzeugte kleine App-Fixtures; Originalspiele und Saves werden dafür nicht
@@ -195,9 +209,11 @@ Originalsignaturen lassen sich nach dem Bauen separat prüfen, ohne Spielstart:
 "$DI2_TRAINER_BUILD_DIR/Dead Island 2 Trainer.app/Contents/MacOS/Trainer" --validate-only steam
 ```
 
-Build, Signatur, Icongrößen, synthetische Tests und die ABI-Abgleiche beider
-oben genannten Original-Builds wurden für den vorbereiteten Stand erfolgreich
-geprüft. Steam-Betrieb einschließlich Waffenfunktionen sowie Mausbedienung wurden
+Für Version 0.6.4 sind Build, Signatur, synthetische Tests, Launcher-Darstellung
+und der lesende MAS-ABI-Abgleich geprüft. Die getrennten Startknöpfe wurden mit
+Testaktionen ohne Spielstart geprüft. Der Steam-ABI-Abgleich war für Version
+0.6.3 erfolgreich; für 0.6.4 wurde er mangels erreichbarer Installation nicht
+wiederholt. Steam-Betrieb einschließlich Waffenfunktionen sowie Mausbedienung wurden
 vom Nutzer als funktionierend gemeldet. Es liegt weiterhin keine vollständige
 Ingame-Testmatrix für alle 26 Funktionen, Gebiete, Waffenarten, langen Sitzungen,
 Koop-Übergänge und iCloud-Synchronisierung vor.
@@ -206,7 +222,7 @@ Koop-Übergänge und iCloud-Synchronisierung vor.
 
 | Pfad | Inhalt |
 | --- | --- |
-| `Sources/Launcher.m` | Editionswahl, Originalprüfung und Spielstart |
+| `Sources/Launcher.m`, `Sources/LauncherView.*` | Editionswahl, kompakter Launcher, Einstellungen, Originalprüfung und Spielstart |
 | `Sources/Runtime.m` | Prozessbegrenzung, Fenster- und Ereignisanbindung |
 | `Sources/Overlay*` | Panel, Maus/Tasten, Anzeigeoptionen und Cursor-Modus |
 | `Sources/TrainerFeatures.*` | Gemeinsamer Funktions- und Tastenkatalog |

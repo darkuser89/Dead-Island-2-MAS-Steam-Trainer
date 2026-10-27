@@ -204,7 +204,7 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
         label(detail ?: @"",NSMakeRect(10,326,520,27),9.5,[NSColor colorWithWhite:0.79 alpha:1],NO,YES);
     }
     NSString *mouseState=!self.wantsMouseInteraction ? @"Spiel" : _state.overlayMouseActive ? @"frei" : @"wartet";
-    label([NSString stringWithFormat:@"⌘ ^ Overlay · ⌘⌥ ^ Maus %@ · Esc schließen · Titelleiste ziehen · v0.6.3",mouseState],NSMakeRect(10,354,520,12),8,[NSColor colorWithWhite:0.5 alpha:1],NO,NO);
+    label([NSString stringWithFormat:@"⌘ ^ Overlay · ⌘⌥ ^ Maus %@ · Esc schließen · Titelleiste ziehen · v0.6.4",mouseState],NSMakeRect(10,354,520,12),8,[NSColor colorWithWhite:0.5 alpha:1],NO,NO);
 }
 - (void)headerClick:(NSPoint)point {
     if (point.y>25) return;

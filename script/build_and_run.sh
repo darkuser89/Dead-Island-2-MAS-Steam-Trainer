@@ -31,7 +31,7 @@ FLAGS=(-arch arm64 -mmacosx-version-min=14.0 -fobjc-arc -O1 -Wall -Wextra -Werro
 xcrun clang "${FLAGS[@]}" -dynamiclib -framework Carbon -framework AppKit -framework QuartzCore \
     "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" "$ROOT/Sources/Runtime.m" -install_name @rpath/TrainerOverlay.dylib -o "$CANDIDATE/Contents/Resources/TrainerOverlay.dylib"
 codesign --force --sign - --timestamp=none "$CANDIDATE/Contents/Resources/TrainerOverlay.dylib"
-xcrun clang "${FLAGS[@]}" -framework AppKit -framework Security -framework UniformTypeIdentifiers "$ROOT/Sources/Launcher.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/GameEdition.m" -o "$CANDIDATE/Contents/MacOS/Trainer"
+xcrun clang "${FLAGS[@]}" -framework AppKit -framework Security -framework UniformTypeIdentifiers "$ROOT/Sources/Launcher.m" "$ROOT/Sources/LauncherView.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/GameEdition.m" -o "$CANDIDATE/Contents/MacOS/Trainer"
 cp "$ROOT/Resources/Info.plist" "$CANDIDATE/Contents/Info.plist"
 cp "$ROOT/LICENSE" "$CANDIDATE/Contents/Resources/LICENSE"
 ICONSET="$STAGE/AppIcon.iconset"
@@ -43,12 +43,15 @@ done
 iconutil --convert icns "$ICONSET" --output "$CANDIDATE/Contents/Resources/AppIcon.icns"
 codesign --force --sign - --options runtime --timestamp=none "$CANDIDATE"
 codesign --verify --deep --strict "$CANDIDATE"
+xcrun clang "${FLAGS[@]}" -framework AppKit -framework QuartzCore \
+    "$ROOT/Tests/LauncherViewTests.m" "$ROOT/Sources/LauncherView.m" "$ROOT/Sources/GameEdition.m" -o "$STAGE/LauncherViewTests"
+"$STAGE/LauncherViewTests" "$STAGE/LauncherPreview.png" "$CANDIDATE/Contents/Resources/AppIcon.icns"
 xcrun clang "${FLAGS[@]}" -framework AppKit -framework Metal -framework QuartzCore \
     "$ROOT/Tests/MetalHost.m" "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" -o "$TEST/Contents/MacOS/TrainerTestHost"
 python3 - "$TEST/Contents/Info.plist" <<'PY'
 import plistlib,sys
 from pathlib import Path
-Path(sys.argv[1]).write_bytes(plistlib.dumps({'CFBundleIdentifier':'local.deadisland2.trainer-test','CFBundleExecutable':'TrainerTestHost','CFBundleName':'Trainer Overlay Metal-Test','CFBundlePackageType':'APPL','CFBundleShortVersionString':'0.6.3','LSMinimumSystemVersion':'14.0','NSPrincipalClass':'NSApplication','NSHighResolutionCapable':True}))
+Path(sys.argv[1]).write_bytes(plistlib.dumps({'CFBundleIdentifier':'local.deadisland2.trainer-test','CFBundleExecutable':'TrainerTestHost','CFBundleName':'Trainer Overlay Metal-Test','CFBundlePackageType':'APPL','CFBundleShortVersionString':'0.6.4','LSMinimumSystemVersion':'14.0','NSPrincipalClass':'NSApplication','NSHighResolutionCapable':True}))
 PY
 xcrun clang "${FLAGS[@]}" -DDI2_OVERLAY_TEST=1 -dynamiclib -framework Carbon -framework AppKit -framework QuartzCore \
     "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" "$ROOT/Sources/Runtime.m" -install_name @rpath/TestOverlay.dylib -o "$STAGE/TestOverlay.dylib"
@@ -75,6 +78,7 @@ except BaseException:
 if previous.exists(): shutil.rmtree(previous)
 PY
 mv "$STAGE/OverlayPreview.png" "$BUILD/OverlayPreview.png"
+mv "$STAGE/LauncherPreview.png" "$BUILD/LauncherPreview.png"
 printf 'Build und Tests erfolgreich: %s\n' "$APP"
 if [[ "$MODE" == --update-only ]]; then
     echo 'Nur die externe App wurde atomar ersetzt. Laufende Prozesse behalten ihren bereits geladenen Code; die neue Version wirkt nach einem regulären Neustart.'
