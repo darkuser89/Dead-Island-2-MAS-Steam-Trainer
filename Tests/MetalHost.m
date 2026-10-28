@@ -25,6 +25,11 @@ static void testMouseRouting(void) {
     window.releasedWhenClosed=NO;
     DI2OverlayRoot *root=[[DI2OverlayRoot alloc]initWithFrame:NSMakeRect(20,30,1060,660) version:@"mouse-test"];
     [window.contentView addSubview:root];
+    [root applyOverlayOptions:DI2InitialOverlayOptions(@{@"visible":@YES,@"badge":@YES,@"mouse":@NO})];
+    NSCAssert(!root.panelVisible && root.panel.hidden && root.badge.hidden && !root.wantsMouseInteraction,
+        @"new game starts completely hidden without capturing the mouse despite old settings");
+    [root togglePanel:nil];
+    NSCAssert(root.panelVisible && root.wantsMouseInteraction,@"first opening automatically enables mouse before clicking controls");
     DI2TrainerState *state=[DI2TrainerState new];state.ready=YES;state.features[DI2FeatureMoney].value=10000;[root updateState:state];
     __block NSInteger calls=0;
     for (NSNumber *scale in @[@0.7,@0.9,@1.3]) for (NSString *position in @[@"top-left",@"top-right",@"bottom-left",@"bottom-right",@"center"]) {
@@ -232,6 +237,14 @@ int main(int argc, const char *argv[]) {
             NSDictionary *roundTrip=DI2DecodeOverlayOptions(DI2EncodeOverlayOptions(@{@"visible":@NO,@"position":@"bottom-right",@"scale":@1.2}));
             NSCAssert(![roundTrip[@"visible"] boolValue] && [roundTrip[@"position"] isEqual:@"bottom-right"],@"launch environment options round trip");
             NSCAssert([DI2DecodeOverlayOptions(@"[1]")[@"visible"] boolValue],@"non-object JSON rejected");
+            NSDictionary *startup=DI2InitialOverlayOptions(@{@"visible":@YES,@"badge":@YES,@"mouse":@NO,
+                @"position":@"free",@"x":@0.4,@"y":@0.6,@"scale":@1.2,@"draggable":@NO});
+            NSCAssert(![startup[@"visible"] boolValue] && ![startup[@"badge"] boolValue] && [startup[@"mouse"] boolValue]
+                && [startup[@"position"] isEqual:@"free"] && [startup[@"x"] doubleValue]==0.4
+                && [startup[@"y"] doubleValue]==0.6 && [startup[@"scale"] doubleValue]==1.2
+                && ![startup[@"draggable"] boolValue],@"new process resets transient UI modes while preserving layout");
+            NSCAssert([DI2InitialOverlayOptions(startup) isEqual:startup]
+                && ![DI2InitialOverlayOptions(nil)[@"visible"] boolValue],@"startup policy is stable and handles first launch");
             NSString *message=DI2OverlayMessage(roundTrip,@"test-session",123);
             NSCAssert([DI2OverlayMessageOptions(message,@"test-session",123) isEqual:roundTrip],@"sandbox-compatible object message round trip");
             NSCAssert(!DI2OverlayMessageOptions(message,@"other-session",123) && !DI2OverlayMessageOptions(message,@"test-session",456)
@@ -284,6 +297,10 @@ int main(int argc, const char *argv[]) {
             [mouseRoot handleEvent:escape];NSCAssert(!mouseRoot.panelVisible && !mouseRoot.wantsMouseInteraction && ready.features[DI2FeatureGod].active,@"Escape closes overlay and releases mouse while preserving cheats");
             NSCAssert(![mouseRoot handleEvent:escape],@"hidden overlay does not swallow the game menu's Escape");
             [mouseRoot applyOverlayOptions:@{@"visible":@YES,@"mouse":@NO}];NSCAssert(!mouseRoot.wantsMouseInteraction && mouseRoot.panelVisible,@"display-only overlay can stay visible during play");
+            [mouseRoot handleEvent:toggle];
+            NSCAssert(!mouseRoot.panelVisible && !mouseRoot.wantsMouseInteraction,@"hiding releases input after display-only mode");
+            [mouseRoot handleEvent:toggle];
+            NSCAssert(mouseRoot.panelVisible && mouseRoot.wantsMouseInteraction,@"reopening enables mouse even after display-only mode");
             DI2OverlayRoot *hotkeyRoot=[[DI2OverlayRoot alloc]initWithFrame:NSMakeRect(0,0,1100,720) version:@"test"];
             [hotkeyRoot updateState:ready];
             DI2OverlayShortcuts *router=[DI2OverlayShortcuts new];router.enabled=YES;

@@ -2,7 +2,7 @@
 
 <img src="Resources/AppIcon.png" width="128" height="128" alt="Trainer-Icon mit Schädel und orangefarbenem Schalter">
 
-Externer Einzelspieler-Trainer **0.6.4** für **Dead Island 2 0.6.4** auf
+Externer Einzelspieler-Trainer **0.6.5** für **Dead Island 2 0.6.4** auf
 Apple Silicon. Unterstützt die Mac-App-Store- und Steam-Version mit einem
 kompakten Ingame-Overlay und 26 Bedienelementen.
 
@@ -72,6 +72,51 @@ Eine neue Overlay-Version wird erst beim nächsten regulären Spielstart über
 den Trainer geladen. Temporäre Austauschbestände werden nach dem Build entfernt;
 die neueste App sowie `OverlayPreview.png` und `LauncherPreview.png` bleiben im separaten Buildordner.
 
+## Automatische Builds und Releases auf GitHub
+
+[GitHub Actions](https://github.com/darkuser89/Dead-Island-2-MAS-Steam-Trainer/actions/workflows/macos.yml)
+baut die App bei Pushes auf `main` und Pull Requests auf einem GitHub-Mac mit Apple
+Silicon. Über **Run workflow** kann ein Build auch manuell gestartet werden.
+Jeder erfolgreiche Lauf stellt ein Build-Artefakt mit App-ZIP, SHA256-Prüfsumme
+und Versionshinweisen für sieben Tage bereit. Builds liegen auf dem Runner
+außerhalb des Quellordners; Spiele und Saves werden dafür nicht benötigt.
+
+Ein Push eines Versions-Tags veröffentlicht nach bestandenen Tests zusätzlich
+ein dauerhaftes GitHub-Release:
+
+1. App-Version und Buildnummer in `Resources/Info.plist` aktualisieren sowie
+   README, Versionsanzeigen und `RELEASE_NOTES.md` anpassen.
+2. Änderungen committen und auf `main` pushen.
+3. Passendes Tag setzen und pushen, zum Beispiel für diesen Stand:
+
+   ```sh
+   git tag v0.6.5
+   git push origin v0.6.5
+   ```
+
+Tag und App-Version müssen exakt übereinstimmen. Bereits veröffentlichte Releases
+werden nicht überschrieben; für Änderungen eine neue Version verwenden.
+Der Workflow lädt zuerst einen Entwurf samt geprüften Dateien hoch und
+veröffentlicht ihn danach. Ein unterbrochener Upload lässt sich über **Re-run jobs**
+fortsetzen, solange das Release noch ein Entwurf ist.
+
+Benötigt werden aktivierte GitHub Actions. Der Release-Job erhält ausschließlich
+für das Veröffentlichen `contents: write` über den automatisch bereitgestellten
+`GITHUB_TOKEN`; eigene Tokens und Apple-Zugangsdaten sind nicht nötig. Die App ist
+weiterhin ad hoc signiert und nicht notarisiert. Auf GitHub werden synthetische
+Tests ausgeführt; lesende Originalspiel-Abgleiche werden dort ausdrücklich als
+nicht durchgeführt gemeldet. Echte Ingame-Tests ersetzt der Workflow nicht.
+
+Das gleiche geprüfte Paket kann lokal erstellt werden:
+
+```sh
+python3 script/package_release.py --build-dir "$DI2_TRAINER_BUILD_DIR" --expected-tag v0.6.5
+```
+
+Es entsteht im separaten Buildordner unter `Release/`. Das Skript prüft
+App-Metadaten, Signatur, Architektur und einen ZIP-Rückvergleich einschließlich
+Ausführungsrechten, bevor es das bisherige Paket ersetzt.
+
 ## Spiel auswählen und starten
 
 1. Launcher öffnen und **Mac App Store** oder **Steam** auswählen.
@@ -98,8 +143,9 @@ Der Trainer allein ändert keine USK-Einstellung und verspricht keine iCloud-Fun
 
 ## Overlay bedienen
 
-- **⌘ + ^**: Overlay anzeigen/verbergen; aktive Schalter bleiben an.
-- **⌘⌥ + ^**: Mausbedienung umschalten, ohne das Panel zu verbergen.
+- Beim Spielstart bleiben Panel und Badge verborgen, unabhängig von der letzten Sitzung.
+- **⌘ + ^**: Overlay anzeigen/verbergen; beim Öffnen wird die Maus automatisch freigegeben. Aktive Schalter bleiben an.
+- **⌘⌥ + ^**: optional Mausbedienung umschalten, ohne das Panel zu verbergen. Beim nächsten Öffnen ist die Maus wieder frei.
 - **Esc** oder **×**: Panel schließen und Spielsteuerung zurückgeben.
 - **F12**: alle Schalter und ausstehenden Spielaktionen ausschalten, auch beim Laden.
 - **− / +** in der Kopfzeile: Größe ändern; **▾**: auf die Kopfzeile einklappen.
@@ -107,8 +153,9 @@ Der Trainer allein ändert keine USK-Einstellung und verspricht keine iCloud-Fun
 
 Standardgröße: ungefähr **486 × 331 Punkte**. Position, Größe, Sichtbarkeit,
 Mausbedienung und optionales Badge lassen sich im Launcher einstellen. Diese
-Anzeigeoptionen werden gespeichert; Cheat-Schalter starten bei jedem neuen
-Spielprozess ausgeschaltet. Bei macOS-Medientasten gegebenenfalls **fn** verwenden.
+Anzeigeoptionen werden gespeichert; jeder neue Spielprozess startet jedoch mit
+verborgenem Panel und Badge und vorbereiteter Mausbedienung. Cheat-Schalter starten
+ausgeschaltet. Bei macOS-Medientasten gegebenenfalls **fn** verwenden.
 **⇧** bedeutet Umschalt, **⌥** bedeutet Option/Alt.
 
 **Grün** bestätigt eine aktive Wirkung; **Orange** bedeutet eingeschaltet,
@@ -209,10 +256,12 @@ Originalsignaturen lassen sich nach dem Bauen separat prüfen, ohne Spielstart:
 "$DI2_TRAINER_BUILD_DIR/Dead Island 2 Trainer.app/Contents/MacOS/Trainer" --validate-only steam
 ```
 
-Für Version 0.6.4 sind Build, Signatur, synthetische Tests, Launcher-Darstellung
-und der lesende MAS-ABI-Abgleich geprüft. Die getrennten Startknöpfe wurden mit
+Für Version 0.6.5 sind Build, Signatur, synthetische Tests, Launcher-Darstellung
+und der lesende MAS-ABI-Abgleich geprüft. Verborgener Sitzungsstart trotz alter
+Anzeigeoptionen und automatische Mausbedienung beim Öffnen/Wiederöffnen sind
+synthetisch geprüft. Die getrennten Startknöpfe wurden mit
 Testaktionen ohne Spielstart geprüft. Der Steam-ABI-Abgleich war für Version
-0.6.3 erfolgreich; für 0.6.4 wurde er mangels erreichbarer Installation nicht
+0.6.3 erfolgreich; für 0.6.5 wurde er mangels erreichbarer Installation nicht
 wiederholt. Steam-Betrieb einschließlich Waffenfunktionen sowie Mausbedienung wurden
 vom Nutzer als funktionierend gemeldet. Es liegt weiterhin keine vollständige
 Ingame-Testmatrix für alle 26 Funktionen, Gebiete, Waffenarten, langen Sitzungen,

@@ -60,7 +60,7 @@ static BOOL uncutAvailable(void) {
 @implementation TrainerDelegate
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     (void)notification;
-    self.options=DI2NormalizeOverlayOptions([NSUserDefaults.standardUserDefaults objectForKey:DI2OverlayPreferencesKey]);
+    self.options=DI2InitialOverlayOptions([NSUserDefaults.standardUserDefaults objectForKey:DI2OverlayPreferencesKey]);
     self.edition=DI2EditionForKey([NSUserDefaults.standardUserDefaults stringForKey:@"GameEdition"]);
     if (self.edition==DI2EditionUnknown) self.edition=DI2EditionMAS;
     NSMenu *menu = [NSMenu new];
@@ -99,7 +99,7 @@ static BOOL uncutAvailable(void) {
     self.window.titleVisibility=NSWindowTitleHidden; self.window.titlebarAppearsTransparent=YES;
     self.window.movableByWindowBackground=YES; self.window.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
     self.window.backgroundColor=[NSColor colorWithWhite:0.075 alpha:1];
-    NSString *version=[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"0.6.4";
+    NSString *version=[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"0.6.5";
     self.launcherView=[[DI2LauncherView alloc]initWithFrame:NSMakeRect(0,0,520,564) version:version];
     self.window.contentView=self.launcherView;
     self.editionPicker=self.launcherView.editionPicker; self.editionPicker.target=self; self.editionPicker.action=@selector(changeEdition:);
@@ -115,7 +115,7 @@ static BOOL uncutAvailable(void) {
     self.settingsWindow.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
     self.showOverlay=[NSButton checkboxWithTitle:@"Overlay anzeigen – beim Verbergen bleiben Cheats aktiv" target:self action:@selector(changeOverlayOptions:)];
     self.showBadge=[NSButton checkboxWithTitle:@"Beim Verbergen ein kleines Trainer-Symbol anzeigen" target:self action:@selector(changeOverlayOptions:)];
-    self.mouseInput=[NSButton checkboxWithTitle:@"Maus im sichtbaren Overlay freigeben (⌘⌥ + ^)" target:self action:@selector(changeOverlayOptions:)];
+    self.mouseInput=[NSButton checkboxWithTitle:@"Maus im sichtbaren Overlay freigeben (beim Öffnen automatisch)" target:self action:@selector(changeOverlayOptions:)];
     self.allowDragging=[NSButton checkboxWithTitle:@"Overlay mit der Maus verschieben: Titelleiste ziehen" target:self action:@selector(changeOverlayOptions:)];
     self.position=[[NSPopUpButton alloc]initWithFrame:NSZeroRect pullsDown:NO];
     [self.position addItemsWithTitles:@[@"Oben links",@"Oben rechts",@"Unten links",@"Unten rechts",@"Mitte",@"Frei / letzte Position"]];
@@ -238,6 +238,8 @@ static BOOL uncutAvailable(void) {
         if (!uncutAvailable()) { self.status.stringValue = @"Der gewählte vorhandene Uncut-Starthelfer ist nicht verfügbar."; return; }
         [libraries addObject:[uncutPath stringByAppendingPathComponent:@"Contents/Resources/RuntimeIdentity.dylib"]];
     }
+    self.options=DI2InitialOverlayOptions(self.options);
+    [self updateOverlayControls];
     self.token = NSUUID.UUID.UUIDString;
     NSWorkspaceOpenConfiguration *configuration = NSWorkspaceOpenConfiguration.configuration;
     configuration.activates = YES;

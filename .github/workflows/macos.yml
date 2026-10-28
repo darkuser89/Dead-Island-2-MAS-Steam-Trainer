@@ -1,0 +1,102 @@
+name: macOS build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: Build and test Apple Silicon app
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      DI2_TRAINER_BUILD_DIR: ${{ runner.temp }}/DeadIsland2Trainer
+      PYTHONDONTWRITEBYTECODE: '1'
+    outputs:
+      version: ${{ steps.package.outputs.version }}
+      archive: ${{ steps.package.outputs.archive }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check runner and release version
+        env:
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+        run: |
+          test "$(uname -m)" = arm64
+          xcodebuild -version
+          python3 script/package_release.py --check-only --expected-tag "$RELEASE_TAG"
+      - name: Build, sign and run synthetic tests
+        run: ./script/build_and_run.sh --build-only
+      - name: Package and verify app archive
+        id: package
+        env:
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+        run: python3 script/package_release.py --build-dir "$DI2_TRAINER_BUILD_DIR" --expected-tag "$RELEASE_TAG"
+      - name: Upload downloadable build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Dead-Island-2-Trainer-${{ steps.package.outputs.version }}-macOS-arm64
+          path: |
+            ${{ runner.temp }}/DeadIsland2Trainer/Release/${{ steps.package.outputs.archive }}
+            ${{ runner.temp }}/DeadIsland2Trainer/Release/SHA256SUMS.txt
+            ${{ runner.temp }}/DeadIsland2Trainer/Release/ReleaseNotes.md
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish tagged release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: Dead-Island-2-Trainer-${{ needs.build.outputs.version }}-macOS-arm64
+          path: ${{ runner.temp }}/trainer-release
+      - name: Verify checksum and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+          ARCHIVE: ${{ needs.build.outputs.archive }}
+          ASSET_DIR: ${{ runner.temp }}/trainer-release
+        run: |
+          set -euo pipefail
+          test "$RELEASE_TAG" = "v$RELEASE_VERSION"
+          test "$ARCHIVE" = "Dead-Island-2-Trainer-$RELEASE_VERSION-macOS-arm64.zip"
+          cd "$ASSET_DIR"
+          sha256sum --check --strict SHA256SUMS.txt
+          # Existing published releases are never overwritten. A failed first
+          # upload can be resumed while the release is still a draft.
+          gh api --paginate --slurp "repos/$GH_REPO/releases" > releases.json
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          matches = [item for page in json.loads(Path('releases.json').read_text()) for item in page]
+          existing = next((item for item in matches if item['tag_name'] == os.environ['RELEASE_TAG']), None)
+          if existing and not existing['draft']:
+              raise SystemExit('This version is already published; create a new version tag.')
+          Path('existing-draft').write_text('yes' if existing else 'no')
+          PY
+          if [[ "$(cat existing-draft)" == no ]]; then
+            gh release create "$RELEASE_TAG" --verify-tag --draft \
+              --title "Dead Island 2 Trainer $RELEASE_VERSION" --notes-file ReleaseNotes.md
+          fi
+          gh release upload "$RELEASE_TAG" "$ARCHIVE" SHA256SUMS.txt --clobber
+          gh release edit "$RELEASE_TAG" --notes-file ReleaseNotes.md --draft=false --latest

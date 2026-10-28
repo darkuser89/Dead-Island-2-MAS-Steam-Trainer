@@ -20,6 +20,11 @@ NSDictionary *DI2NormalizeOverlayOptions(id input) {
         @"x":@(bounded(source[@"x"],0,0,1)),@"y":@(bounded(source[@"y"],0,0,1)),
         @"scale":@(bounded(source[@"scale"],0.9,0.7,1.3))};
 }
+NSDictionary *DI2InitialOverlayOptions(id input) {
+    NSMutableDictionary *options=[DI2NormalizeOverlayOptions(input) mutableCopy];
+    options[@"visible"]=@NO; options[@"badge"]=@NO; options[@"mouse"]=@YES;
+    return [options copy];
+}
 NSString *DI2EncodeOverlayOptions(NSDictionary *options) {
     NSData *data=[NSJSONSerialization dataWithJSONObject:DI2NormalizeOverlayOptions(options) options:0 error:NULL];
     return [[NSString alloc]initWithData:data encoding:NSUTF8StringEncoding] ?: @"{}";

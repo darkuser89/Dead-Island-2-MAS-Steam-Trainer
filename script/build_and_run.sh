@@ -48,10 +48,11 @@ xcrun clang "${FLAGS[@]}" -framework AppKit -framework QuartzCore \
 "$STAGE/LauncherViewTests" "$STAGE/LauncherPreview.png" "$CANDIDATE/Contents/Resources/AppIcon.icns"
 xcrun clang "${FLAGS[@]}" -framework AppKit -framework Metal -framework QuartzCore \
     "$ROOT/Tests/MetalHost.m" "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" -o "$TEST/Contents/MacOS/TrainerTestHost"
-python3 - "$TEST/Contents/Info.plist" <<'PY'
+python3 - "$TEST/Contents/Info.plist" "$ROOT/Resources/Info.plist" <<'PY'
 import plistlib,sys
 from pathlib import Path
-Path(sys.argv[1]).write_bytes(plistlib.dumps({'CFBundleIdentifier':'local.deadisland2.trainer-test','CFBundleExecutable':'TrainerTestHost','CFBundleName':'Trainer Overlay Metal-Test','CFBundlePackageType':'APPL','CFBundleShortVersionString':'0.6.4','LSMinimumSystemVersion':'14.0','NSPrincipalClass':'NSApplication','NSHighResolutionCapable':True}))
+version=plistlib.loads(Path(sys.argv[2]).read_bytes())['CFBundleShortVersionString']
+Path(sys.argv[1]).write_bytes(plistlib.dumps({'CFBundleIdentifier':'local.deadisland2.trainer-test','CFBundleExecutable':'TrainerTestHost','CFBundleName':'Trainer Overlay Metal-Test','CFBundlePackageType':'APPL','CFBundleShortVersionString':version,'LSMinimumSystemVersion':'14.0','NSPrincipalClass':'NSApplication','NSHighResolutionCapable':True}))
 PY
 xcrun clang "${FLAGS[@]}" -DDI2_OVERLAY_TEST=1 -dynamiclib -framework Carbon -framework AppKit -framework QuartzCore \
     "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" "$ROOT/Sources/Runtime.m" -install_name @rpath/TestOverlay.dylib -o "$STAGE/TestOverlay.dylib"

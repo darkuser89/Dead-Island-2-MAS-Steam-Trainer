@@ -84,7 +84,7 @@ static NSTextField *text(NSString *value, CGFloat size, NSFontWeight weight, NSC
     _uncutStart=[[DI2LaunchButton alloc]initWithFrame:NSZeroRect]; ((DI2LaunchButton *)_uncutStart).uncutStyle=YES;
     _uncutStart.title=@"Spiel Uncut mit Trainer starten"; _uncutStart.accessibilityLabel=_uncutStart.title;
     [_uncutStart setButtonType:NSButtonTypeMomentaryPushIn]; _uncutStart.bordered=NO;
-    _hint=text(@"Alle Cheats sind beim Start ausgeschaltet.",12,NSFontWeightRegular,NSColor.secondaryLabelColor); _hint.alignment=NSTextAlignmentCenter;
+    _hint=text(@"⌘ + ^ öffnet das Overlay mit Mausbedienung.",12,NSFontWeightRegular,NSColor.secondaryLabelColor); _hint.alignment=NSTextAlignmentCenter;
     _status=[NSTextField wrappingLabelWithString:@""]; _status.font=[NSFont systemFontOfSize:11];
     _status.textColor=NSColor.secondaryLabelColor; _status.alignment=NSTextAlignmentCenter; _status.maximumNumberOfLines=2;
     _shortcuts=@[text(@"⌘^  Overlay",11,NSFontWeightSemibold,NSColor.secondaryLabelColor),text(@"⌘⌥^  Maus",11,NSFontWeightSemibold,NSColor.secondaryLabelColor),text(@"F12  Cheats aus",11,NSFontWeightSemibold,NSColor.secondaryLabelColor)];

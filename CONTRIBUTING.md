@@ -20,6 +20,17 @@ Builds, App-Bundles, Caches und Laufzeitlogs außerhalb des Quellordners halten.
 Keine Originalspiele, Saves, Zugangsdaten oder Signierschlüssel einchecken.
 Die Icon-Quelldatei ist versioniert; `.icns` und Iconsets entstehen nur im Build.
 
+## GitHub Actions und Veröffentlichung
+
+`.github/workflows/macos.yml` verwendet den gleichen Build mit allen synthetischen
+Tests auf `macos-15` (arm64). Actions sind auf konkrete Commit-SHAs festgelegt.
+Pushes auf `main`, Pull Requests und manuelle Läufe liefern ein kurzlebiges
+Download-Artefakt. Nur gepushte `v*`-Tags lösen den Release-Job mit Schreibrecht aus.
+Tag und `CFBundleShortVersionString` müssen übereinstimmen. Versionshinweise unter
+`RELEASE_NOTES.md` vor dem Taggen aktualisieren; die Release-Dateien werden über
+`script/package_release.py` erstellt und geprüft. Veröffentlichte Versionen werden
+nicht überschrieben. Keine Spiele oder Zugangsdaten für die CI hinterlegen.
+
 ## Native Anbindungen ändern
 
 - Neue Spiel-Builds nicht allein anhand ihrer Versionsnummer freigeben.

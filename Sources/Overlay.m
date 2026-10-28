@@ -204,7 +204,7 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
         label(detail ?: @"",NSMakeRect(10,326,520,27),9.5,[NSColor colorWithWhite:0.79 alpha:1],NO,YES);
     }
     NSString *mouseState=!self.wantsMouseInteraction ? @"Spiel" : _state.overlayMouseActive ? @"frei" : @"wartet";
-    label([NSString stringWithFormat:@"⌘ ^ Overlay · ⌘⌥ ^ Maus %@ · Esc schließen · Titelleiste ziehen · v0.6.4",mouseState],NSMakeRect(10,354,520,12),8,[NSColor colorWithWhite:0.5 alpha:1],NO,NO);
+    label([NSString stringWithFormat:@"⌘ ^ Overlay · ⌘⌥ ^ Maus %@ · Esc schließen · Titelleiste ziehen · v0.6.5",mouseState],NSMakeRect(10,354,520,12),8,[NSColor colorWithWhite:0.5 alpha:1],NO,NO);
 }
 - (void)headerClick:(NSPoint)point {
     if (point.y>25) return;
@@ -221,7 +221,15 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
     [self.window invalidateCursorRectsForView:_panel];
 }
 - (BOOL)wantsMouseInteraction { return self.panelVisible && [_options[@"mouse"] boolValue]; }
-- (void)togglePanel:(id)sender { (void)sender; self.panelVisible=!self.panelVisible; [self notifyOptionsChanged]; }
+- (void)togglePanel:(id)sender {
+    (void)sender;
+    if (!self.panelVisible) {
+        NSMutableDictionary *options=[self.overlayOptions mutableCopy];
+        options[@"visible"]=@YES; options[@"mouse"]=@YES;
+        [self applyOverlayOptions:options];
+    } else self.panelVisible=NO;
+    [self notifyOptionsChanged];
+}
 - (void)toggleMouseInteraction {
     NSMutableDictionary *options=[self.overlayOptions mutableCopy]; options[@"mouse"]=@(![_options[@"mouse"] boolValue]);
     [self applyOverlayOptions:options]; [self notifyOptionsChanged];

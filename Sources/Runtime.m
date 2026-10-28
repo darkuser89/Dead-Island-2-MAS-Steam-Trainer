@@ -158,7 +158,7 @@ __attribute__((constructor)) static void startOverlay(void) {
         runtimeLog = os_log_create("local.deadisland2.trainer", "overlay");
         if (!supportedProcess()) { os_log_error(runtimeLog, "Unsupported process; overlay not installed"); return; }
         sessionToken = [NSProcessInfo.processInfo.environment[@"DI2_TRAINER_SESSION"] copy];
-        overlayOptions=DI2DecodeOverlayOptions(NSProcessInfo.processInfo.environment[@"DI2_TRAINER_OVERLAY_OPTIONS"]);
+        overlayOptions=DI2InitialOverlayOptions(DI2DecodeOverlayOptions(NSProcessInfo.processInfo.environment[@"DI2_TRAINER_OVERLAY_OPTIONS"]));
         os_log(runtimeLog, "Trainer overlay library loaded in pid=%{public}d", getpid());
         dispatch_async(dispatch_get_main_queue(), ^{
             roots = [NSMutableArray new];
