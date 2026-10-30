@@ -2,7 +2,7 @@
 
 <img src="Resources/AppIcon.png" width="128" height="128" alt="Trainer-Icon mit Schädel und orangefarbenem Schalter">
 
-Externer Einzelspieler-Trainer **0.6.10** für **Dead Island 2 0.6.4** auf
+Externer Einzelspieler-Trainer **0.6.11** für **Dead Island 2 0.6.4** auf
 Apple Silicon. Unterstützt die Mac-App-Store- und Steam-Version mit einem
 kompakten Ingame-Overlay und 26 Bedienelementen.
 
@@ -109,8 +109,8 @@ ein dauerhaftes GitHub-Release:
 3. Passendes Tag setzen und pushen, zum Beispiel für diesen Stand:
 
    ```sh
-   git tag v0.6.10
-   git push origin v0.6.10
+   git tag v0.6.11
+   git push origin v0.6.11
    ```
 
 Tag und App-Version müssen exakt übereinstimmen. Bereits veröffentlichte Releases
@@ -129,7 +129,7 @@ nicht durchgeführt gemeldet. Echte Ingame-Tests ersetzt der Workflow nicht.
 Das gleiche geprüfte Paket kann lokal erstellt werden:
 
 ```sh
-python3 script/package_release.py --build-dir "$DI2_TRAINER_BUILD_DIR" --expected-tag v0.6.10
+python3 script/package_release.py --build-dir "$DI2_TRAINER_BUILD_DIR" --expected-tag v0.6.11
 ```
 
 Es entsteht im separaten Buildordner unter `Release/`. Das Skript prüft
@@ -323,12 +323,12 @@ Originalsignaturen lassen sich nach dem Bauen separat prüfen, ohne Spielstart:
 "$DI2_TRAINER_BUILD_DIR/Dead Island 2 Trainer.app/Contents/MacOS/Trainer" --validate-only steam
 ```
 
-Für Version 0.6.10 sind Build, Signatur, synthetische Tests, Launcher-Darstellung
+Für Version 0.6.11 sind Build, Signatur, synthetische Tests, Launcher-Darstellung
 und der lesende MAS-ABI-Abgleich geprüft. Verborgener Sitzungsstart trotz alter
 Anzeigeoptionen und automatische Mausbedienung beim Öffnen/Wiederöffnen sind
 synthetisch geprüft. Die getrennten Startknöpfe wurden mit
 Testaktionen ohne Spielstart geprüft. Der Steam-ABI-Abgleich war für Version
-0.6.3 erfolgreich; für 0.6.10 wurde er mangels erreichbarer Installation nicht
+0.6.3 erfolgreich; für 0.6.11 wurde er mangels erreichbarer Installation nicht
 wiederholt. Steam-Betrieb einschließlich Waffenfunktionen sowie Mausbedienung wurden
 vom Nutzer als funktionierend gemeldet. Es liegt weiterhin keine vollständige
 Ingame-Testmatrix für alle 26 Funktionen, Gebiete, Waffenarten, langen Sitzungen,

@@ -134,7 +134,7 @@ static BOOL uncutAvailable(void) {
     self.window.titleVisibility=NSWindowTitleVisible; self.window.titlebarAppearsTransparent=NO;
     self.window.movableByWindowBackground=YES;
     self.window.opaque=YES; self.window.backgroundColor=NSColor.windowBackgroundColor;
-    NSString *version=[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"0.6.10";
+    NSString *version=[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"0.6.11";
     self.launcherView=[[DI2LauncherView alloc]initWithFrame:NSMakeRect(0,0,520,564) version:version];
     self.window.contentView=self.launcherView;
     self.editionPicker=self.launcherView.editionPicker; self.editionPicker.target=self; self.editionPicker.action=@selector(changeEdition:);

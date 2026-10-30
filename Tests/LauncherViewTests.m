@@ -24,7 +24,7 @@ int main(int argc,const char *argv[]) {
         [NSApplication sharedApplication];
         NSWindow *window=[[NSWindow alloc]initWithContentRect:NSMakeRect(0,0,520,564) styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO];
         window.releasedWhenClosed=NO; window.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
-        DI2LauncherView *view=[[DI2LauncherView alloc]initWithFrame:NSMakeRect(0,0,520,564) version:@"0.6.10"];
+        DI2LauncherView *view=[[DI2LauncherView alloc]initWithFrame:NSMakeRect(0,0,520,564) version:@"0.6.11"];
         window.contentView=view; [view layout];
         DI2LauncherCounter *counter=[DI2LauncherCounter new];
         view.start.target=counter; view.start.action=@selector(start:);
