@@ -285,6 +285,11 @@ unabhängig. Ein bestätigter Netzwerkmodus löscht die angeforderten Schalter;
 auch „Cheats aus“ während des Ladens wird gespeichert. Das Overlay startet
 weiterhin verborgen. Beide Startknöpfe verwenden dieselbe gewählte Einstellung.
 
+Release-Builds auf GitHub wählen Xcode 26.3 ausdrücklich aus. Die Paketprüfung
+verlangt schwach gebundene Liquid-Glass-Symbole in Launcher und Overlay, damit
+auch der Download natives Glas auf macOS 26+ enthält. Ältere Systeme verwenden
+weiterhin den Material-Fallback; das Mindestziel bleibt macOS 14.
+
 ## Tests und Kompatibilitätsprüfung
 
 Der Build prüft synthetisch unter anderem alle 26 Anbindungen, Wiederherstellung,

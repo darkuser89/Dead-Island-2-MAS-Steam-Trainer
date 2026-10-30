@@ -55,6 +55,9 @@ def main():
     for binary in [app / 'Contents/MacOS/Trainer', app / 'Contents/Resources/TrainerOverlay.dylib']:
         if subprocess.check_output(['lipo', '-archs', str(binary)], text=True).strip() != 'arm64':
             raise ValueError('Expected an Apple Silicon binary')
+        symbols = subprocess.check_output(['nm', '-m', str(binary)], text=True)
+        if not any('weak external _OBJC_CLASS_$_NSGlassEffectView' in line for line in symbols.splitlines()):
+            raise ValueError('Release binary lacks weak-linked Liquid Glass support; build with macOS SDK 26+')
     release = build / 'Release'
     release.mkdir(exist_ok=True)
     archive = f'Dead-Island-2-Trainer-{version}-macOS-arm64.zip'
