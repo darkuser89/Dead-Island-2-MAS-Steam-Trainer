@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #import "GameBridge.h"
+#import "SelectionSettings.h"
 #import "GameAccess.h"
 #import "ExtraFeatures.h"
 #import "OverlayInput.h"
@@ -77,6 +78,20 @@ static const size_t recoilOffsets[]={0xc8,0xe0,0xf8,0x110};
         if (!_supported) _state.status=@"Spiel-Build nicht unterstützt";
         os_log(_log,"Native game ABI supported=%d",_supported);
     } return self;
+}
+- (void)restoreSelection:(NSDictionary *)selection {
+    NSAssert(NSThread.isMainThread,@"Restore before the first game-thread poll");
+    NSAssert(!_inFlight && !_context && !_commands.count,@"Restore only at session startup");
+    if (_inFlight || _context || _commands.count) return;
+    NSDictionary *entries=DI2NormalizeCheatSelection(selection)[@"features"];
+    BOOL changed=NO;
+    for (NSInteger i=0;i<DI2FeatureCount;i++) {
+        NSDictionary *entry=entries[[NSString stringWithFormat:@"%ld",(long)i]];
+        _wanted[i]=[entry[@"wanted"] boolValue]; _values[i]=[entry[@"value"] doubleValue];
+        changed|=_wanted[i] || _values[i]!=DI2FeatureInfoAt(i)->initial;
+        _state.features[i].wanted=_wanted[i]; _state.features[i].value=_values[i];
+    }
+    if (changed) { _lastMessage=@"Gespeicherte Auswahl wird nach dem Laden aktiviert."; _state.message=_lastMessage; }
 }
 - (BOOL)object:(void *)object isA:(void *)class {
     void *actual=NULL;
@@ -245,6 +260,7 @@ static const size_t recoilOffsets[]={0xc8,0xe0,0xf8,0x110};
     if (mode==DI2SessionNetwork) memset(_wanted,0,sizeof(_wanted));
     if (command==DI2TrainerDisableAll) { [self disableAll]; _lastMessage=@"Alle Laufzeitschalter aus."; }
     state.context=_context;
+    state.selectionCanBeSaved=solo || mode==DI2SessionNetwork || command==DI2TrainerDisableAll;
     state.status=player ? (solo ? @"Einzelspieler" : @"Netzwerk · gesperrt") : @"Einzelspieler laden …";
     if (!solo) {
         for (NSInteger i=0;i<DI2FeatureCount;i++) {

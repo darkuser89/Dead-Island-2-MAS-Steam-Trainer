@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #import "LauncherView.h"
 #import <QuartzCore/QuartzCore.h>
+#import "OverlayShortcuts.h"
+#import "TrainerMaterial.h"
 
 static NSColor *accent(void) { return [NSColor colorWithRed:1 green:0.40 blue:0.15 alpha:1]; }
 static NSTextField *text(NSString *value, CGFloat size, NSFontWeight weight, NSColor *color) {
@@ -8,51 +10,69 @@ static NSTextField *text(NSString *value, CGFloat size, NSFontWeight weight, NSC
     label.font=[NSFont systemFontOfSize:size weight:weight]; label.textColor=color;
     return label;
 }
-@interface DI2LauncherCard : NSView
+@interface DI2LauncherContent : NSView
 @end
-@implementation DI2LauncherCard
+@implementation DI2LauncherContent
 - (BOOL)isFlipped { return YES; }
-- (void)drawRect:(NSRect)dirty {
-    (void)dirty; NSBezierPath *shape=[NSBezierPath bezierPathWithRoundedRect:NSInsetRect(self.bounds,0.5,0.5) xRadius:14 yRadius:14];
-    [[NSColor colorWithWhite:0.115 alpha:1] setFill]; [shape fill];
-    [[NSColor colorWithWhite:0.18 alpha:1] setStroke]; [shape stroke];
-}
 @end
 
-@interface DI2LaunchButton : NSButton
-@property(nonatomic) BOOL uncutStyle;
-@end
-@implementation DI2LaunchButton
-- (void)drawRect:(NSRect)dirty {
-    (void)dirty;
-    NSColor *buttonColor=self.uncutStyle ? [NSColor colorWithRed:0.88 green:0.19 blue:0.16 alpha:1] : accent();
-    NSColor *fill=self.enabled ? buttonColor : [buttonColor blendedColorWithFraction:0.85 ofColor:[NSColor colorWithWhite:0.18 alpha:1]];
-    if(self.enabled && self.cell.isHighlighted) fill=[buttonColor blendedColorWithFraction:0.12 ofColor:NSColor.blackColor];
-    [fill setFill]; [[NSBezierPath bezierPathWithRoundedRect:self.bounds xRadius:12 yRadius:12] fill];
-    NSString *title=[NSString stringWithFormat:@"%@%@",self.enabled ? @"▶ " : @"",self.title];
-    NSColor *ink=self.enabled ? (self.uncutStyle ? NSColor.whiteColor : [NSColor colorWithWhite:0.07 alpha:1]) : NSColor.secondaryLabelColor;
-    NSDictionary *style=@{NSFontAttributeName:[NSFont systemFontOfSize:17 weight:NSFontWeightBold],NSForegroundColorAttributeName:ink};
-    NSSize size=[title sizeWithAttributes:style];
-    [title drawAtPoint:NSMakePoint((NSWidth(self.bounds)-size.width)/2,(NSHeight(self.bounds)-size.height)/2) withAttributes:style];
-    if(self.window.firstResponder==self && self.enabled) {
-        [[NSColor colorWithWhite:1 alpha:0.7] setStroke];
-        NSBezierPath *ring=[NSBezierPath bezierPathWithRoundedRect:NSInsetRect(self.bounds,3,3) xRadius:9 yRadius:9];
-        ring.lineWidth=2; [ring stroke];
-    }
+NSView *DI2LauncherSurface(NSView *content, CGFloat radius, BOOL glassEnabled) {
+    DI2TrainerMaterial *surface=[[DI2TrainerMaterial alloc]initWithContentView:content cornerRadius:radius];
+    surface.liquidGlassEnabled=glassEnabled;
+    if([content isKindOfClass:NSButton.class])surface.tintColor=((NSButton *)content).bezelColor;
+    return surface;
 }
-@end
+
+static NSButton *launchButton(NSString *title, NSColor *tint, BOOL glass) {
+    NSButton *button=[NSButton buttonWithTitle:title target:nil action:NULL];
+    button.controlSize=NSControlSizeLarge; button.font=[NSFont systemFontOfSize:16 weight:NSFontWeightSemibold];
+    button.bezelStyle=NSBezelStyleRounded;
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 260000
+    if (@available(macOS 26.0,*)) {
+        if(glass) {
+            button.bordered=NO;
+            button.contentTintColor=NSColor.whiteColor;
+            button.controlSize=NSControlSizeExtraLarge;
+        }
+    }
+#else
+    (void)glass;
+#endif
+    button.bezelColor=tint;
+    button.image=[NSImage imageWithSystemSymbolName:@"play.fill" accessibilityDescription:nil];
+    button.imagePosition=NSImageLeading; button.imageHugsTitle=YES;
+    button.accessibilityLabel=title;
+    return button;
+}
 
 @implementation DI2LauncherView {
-    DI2LauncherCard *_card;
+    NSView *_card, *_cardContent, *_content, *_group, *_startSurface, *_uncutSurface;
+    BOOL _usesLiquidGlass;
     NSTextField *_eyebrow, *_heading, *_version, *_gameTitle, *_hint;
     NSArray<NSTextField *> *_shortcuts;
 }
 - (BOOL)isFlipped { return YES; }
-- (void)drawRect:(NSRect)dirty { (void)dirty; [[NSColor colorWithWhite:0.075 alpha:1] setFill]; NSRectFill(self.bounds); }
+- (BOOL)usesLiquidGlass {return _usesLiquidGlass && ((DI2TrainerMaterial *)_card).materialMode==DI2TrainerMaterialLiquidGlass;}
+- (void)drawRect:(NSRect)dirty {(void)dirty;[NSColor.windowBackgroundColor setFill];NSRectFill(self.bounds);}
 - (instancetype)initWithFrame:(NSRect)frame version:(NSString *)version {
+    return [self initWithFrame:frame version:version glassEnabled:YES];
+}
+- (instancetype)initWithFrame:(NSRect)frame version:(NSString *)version glassEnabled:(BOOL)enabled {
     if(!(self=[super initWithFrame:frame]))return nil;
     self.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;
-    self.wantsLayer=YES; self.layer.backgroundColor=[NSColor colorWithWhite:0.075 alpha:1].CGColor;
+    _content=[[DI2LauncherContent alloc]initWithFrame:self.bounds];
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 260000
+    if (@available(macOS 26.0,*)) {
+        if(enabled) {
+            NSGlassEffectContainerView *container=[[NSGlassEffectContainerView alloc]initWithFrame:self.bounds];
+            container.contentView=_content; _group=container; _usesLiquidGlass=YES;
+        }
+    }
+#else
+    (void)enabled;
+#endif
+    if(!_group)_group=_content;
+    _group.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable; [self addSubview:_group];
     _eyebrow=text(@"TRAINER",12,NSFontWeightBold,accent());
     _heading=text(@"Dead Island 2",30,NSFontWeightBold,NSColor.labelColor);
     _version=text([NSString stringWithFormat:@"v%@",version],10,NSFontWeightMedium,NSColor.secondaryLabelColor);
@@ -64,9 +84,8 @@ static NSTextField *text(NSString *value, CGFloat size, NSFontWeight weight, NSC
     _editionPicker.segmentStyle=NSSegmentStyleRounded; _editionPicker.controlSize=NSControlSizeLarge;
     _editionPicker.font=[NSFont systemFontOfSize:14 weight:NSFontWeightMedium];
     _editionPicker.accessibilityLabel=@"Spiele-Version";
-    _card=[[DI2LauncherCard alloc]initWithFrame:NSZeroRect]; _card.wantsLayer=YES;
-    _card.layer.cornerRadius=14; _card.layer.backgroundColor=[NSColor colorWithWhite:0.115 alpha:1].CGColor;
-    _card.layer.borderWidth=1; _card.layer.borderColor=[NSColor colorWithWhite:0.18 alpha:1].CGColor;
+    _cardContent=[[DI2LauncherContent alloc]initWithFrame:NSMakeRect(0,0,460,90)];
+    _card=DI2LauncherSurface(_cardContent,18,_usesLiquidGlass);
     _gameIcon=[[NSImageView alloc]initWithFrame:NSZeroRect]; _gameIcon.imageScaling=NSImageScaleProportionallyUpOrDown;
     _gameIcon.wantsLayer=YES; _gameIcon.layer.cornerRadius=9; _gameIcon.layer.masksToBounds=YES;
     _gameIcon.accessibilityLabel=@"Dead Island 2 Spielsymbol";
@@ -77,20 +96,21 @@ static NSTextField *text(NSString *value, CGFloat size, NSFontWeight weight, NSC
     _chooseGame.accessibilityLabel=@"Spiele-App ändern";
     _steamButton=[NSButton buttonWithTitle:@"Steam öffnen" target:nil action:NULL]; _steamButton.bordered=NO;
     _steamButton.font=[NSFont systemFontOfSize:10]; _steamButton.contentTintColor=NSColor.secondaryLabelColor;
-    for(NSView *child in @[_gameIcon,_gameTitle,_installationStatus,_chooseGame,_steamButton])[_card addSubview:child];
-    _start=[[DI2LaunchButton alloc]initWithFrame:NSZeroRect]; _start.title=@"Spiel mit Trainer starten";
-    [_start setButtonType:NSButtonTypeMomentaryPushIn]; _start.bordered=NO; _start.keyEquivalent=@"\r";
-    _start.accessibilityLabel=@"Spiel mit Trainer starten";
-    _uncutStart=[[DI2LaunchButton alloc]initWithFrame:NSZeroRect]; ((DI2LaunchButton *)_uncutStart).uncutStyle=YES;
-    _uncutStart.title=@"Spiel Uncut mit Trainer starten"; _uncutStart.accessibilityLabel=_uncutStart.title;
-    [_uncutStart setButtonType:NSButtonTypeMomentaryPushIn]; _uncutStart.bordered=NO;
-    _hint=text(@"⌘ + ^ öffnet das Overlay mit Mausbedienung.",12,NSFontWeightRegular,NSColor.secondaryLabelColor); _hint.alignment=NSTextAlignmentCenter;
+    for(NSView *child in @[_gameIcon,_gameTitle,_installationStatus,_chooseGame,_steamButton])[_cardContent addSubview:child];
+    _start=launchButton(@"Spiel mit Trainer starten",accent(),_usesLiquidGlass); _start.keyEquivalent=@"\r";
+    _uncutStart=launchButton(@"Spiel Uncut mit Trainer starten",[NSColor colorWithRed:0.88 green:0.19 blue:0.16 alpha:1],_usesLiquidGlass);
+    _startSurface=_usesLiquidGlass ? DI2LauncherSurface(_start,27,YES) : _start;
+    _uncutSurface=_usesLiquidGlass ? DI2LauncherSurface(_uncutStart,27,YES) : _uncutStart;
+    _restoreCheats=[NSButton checkboxWithTitle:@"Cheat-Auswahl beim nächsten Start laden" target:nil action:NULL];
+    _restoreCheats.font=[NSFont systemFontOfSize:12];
+    _restoreCheats.toolTip=@"Schalter und Zahlenwerte werden getrennt für Mac App Store und Steam gespeichert. Einmalaktionen laufen nie automatisch.";
+    _hint=text([NSString stringWithFormat:@"%@ öffnet das Overlay mit Mausbedienung.",DI2HotkeyAt(DI2HotkeyPanel).label],12,NSFontWeightRegular,NSColor.secondaryLabelColor); _hint.alignment=NSTextAlignmentCenter;
     _status=[NSTextField wrappingLabelWithString:@""]; _status.font=[NSFont systemFontOfSize:11];
     _status.textColor=NSColor.secondaryLabelColor; _status.alignment=NSTextAlignmentCenter; _status.maximumNumberOfLines=2;
-    _shortcuts=@[text(@"⌘^  Overlay",11,NSFontWeightSemibold,NSColor.secondaryLabelColor),text(@"⌘⌥^  Maus",11,NSFontWeightSemibold,NSColor.secondaryLabelColor),text(@"F12  Cheats aus",11,NSFontWeightSemibold,NSColor.secondaryLabelColor)];
+    _shortcuts=@[text([DI2HotkeyAt(DI2HotkeyPanel).label stringByAppendingString:@"  Overlay"],11,NSFontWeightSemibold,NSColor.secondaryLabelColor),text([DI2HotkeyAt(DI2HotkeyMouse).label stringByAppendingString:@"  Maus"],11,NSFontWeightSemibold,NSColor.secondaryLabelColor),text([DI2HotkeyReadableLabel(DI2HotkeyDisableAll) stringByAppendingString:@" · Aus"],11,NSFontWeightSemibold,NSColor.secondaryLabelColor)];
     for(NSTextField *shortcut in _shortcuts)shortcut.alignment=NSTextAlignmentCenter;
-    for(NSView *child in @[_eyebrow,_heading,_version,_settingsButton,_editionPicker,_card,_start,_uncutStart,_hint,_status])[self addSubview:child];
-    for(NSView *child in _shortcuts)[self addSubview:child];
+    for(NSView *child in @[_eyebrow,_heading,_version,_settingsButton,_editionPicker,_card,_startSurface,_uncutSurface,_restoreCheats,_hint,_status])[_content addSubview:child];
+    for(NSView *child in _shortcuts)[_content addSubview:child];
     [self layout]; return self;
 }
 - (void)layout {
@@ -104,18 +124,22 @@ static NSTextField *text(NSString *value, CGFloat size, NSFontWeight weight, NSC
     _gameIcon.frame=NSMakeRect(18,22,46,46); _gameTitle.frame=NSMakeRect(82,21,content-190,26);
     _installationStatus.frame=NSMakeRect(82,49,content-190,21);
     _chooseGame.frame=NSMakeRect(content-94,27,80,25); _steamButton.frame=NSMakeRect(content-107,58,94,18);
-    _start.frame=NSMakeRect(margin,302,content,54); _uncutStart.frame=NSMakeRect(margin,368,content,54);
-    _hint.frame=NSMakeRect(margin,443,content,20);
-    _status.frame=NSMakeRect(margin,473,content,33);
+    _startSurface.frame=NSMakeRect(margin,302,content,54); _uncutSurface.frame=NSMakeRect(margin,368,content,54);
+    _restoreCheats.frame=NSMakeRect(margin,434,content,22);
+    _hint.frame=NSMakeRect(margin,463,content,20);
+    _status.frame=NSMakeRect(margin,487,content,31);
     CGFloat part=content/3;
     for(NSUInteger i=0;i<_shortcuts.count;i++)_shortcuts[i].frame=NSMakeRect(margin+i*part,521,part,18);
 }
+- (void)showSelectionHint:(NSString *)hint { _hint.stringValue=hint; }
 - (void)showEdition:(DI2GameEdition)edition found:(BOOL)found running:(BOOL)running uncutAvailable:(BOOL)helper path:(NSString *)path {
     _editionPicker.selectedSegment=edition==DI2EditionSteam ? 1 : 0;
     _editionPicker.enabled=!running; _chooseGame.enabled=!running;
     _steamButton.hidden=edition!=DI2EditionSteam;
     _start.enabled=found && !running; _start.title=running ? @"Spiel läuft" : @"Spiel mit Trainer starten";
     _uncutStart.enabled=found && !running && edition==DI2EditionMAS && helper;
+    _startSurface.alphaValue=_start.enabled ? 1 : 0.5;
+    _uncutSurface.alphaValue=_uncutStart.enabled ? 1 : 0.5;
     _uncutStart.toolTip=edition!=DI2EditionMAS ? @"Der zusätzliche Uncut-Starthelfer ist nur für die Mac-App-Store-Version vorgesehen."
         : !helper ? @"Der separate Helfer /Applications/Dead Island 2 Uncut.app wird benötigt."
         : @"Startet die Mac-App-Store-Version mit Trainer und vorhandenem externen Uncut-Helfer. Spiele-Dateien bleiben unverändert.";

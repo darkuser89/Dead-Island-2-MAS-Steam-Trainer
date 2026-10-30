@@ -3,6 +3,9 @@
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
 #import "Overlay.h"
+#import "TrainerMaterial.h"
+void DI2PresentationRunTests(void);
+#import <objc/runtime.h>
 #include <math.h>
 @interface DI2OverlayRoot (LayoutTesting)
 - (void)editFeature:(DI2Feature)feature;
@@ -37,14 +40,14 @@ static void testMouseRouting(void) {
         for (NSInteger i=0;i<DI2FeatureCount;i++) {
             NSInteger before=calls;
             root.featureHandler=^(DI2Feature feature) { NSCAssert(feature==i,@"mouse targets the clicked feature");calls++; };
-            click(window,root,root.panel.subviews[i],NSMakePoint(244,10));
+            click(window,root,root.panelContent.subviews[i],NSMakePoint(244,10));
             NSCAssert(calls==before+1,@"all 26 toggles/GO dispatch once across scales and positions");
         }
     }
     root.featureHandler=^(DI2Feature feature) { (void)feature;calls++; };
     __block double value=0;
     root.valueHandler=^(DI2Feature feature,double amount) { NSCAssert(feature==DI2FeatureMoney,@"clicked money control");value=amount; };
-    NSView *money=root.panel.subviews[DI2FeatureMoney];
+    NSView *money=root.panelContent.subviews[DI2FeatureMoney];
     click(window,root,money,NSMakePoint(147,10));NSCAssert(value==9000,@"minus changes numeric value");
     click(window,root,money,NSMakePoint(222,10));NSCAssert(value==11000,@"plus changes numeric value");
     click(window,root,money,NSMakePoint(170,10));
@@ -52,12 +55,12 @@ static void testMouseRouting(void) {
     NSEvent *enter=[NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint modifierFlags:0 timestamp:0 windowNumber:window.windowNumber context:nil characters:@"\r" charactersIgnoringModifiers:@"\r" isARepeat:NO keyCode:36];
     [root handleEvent:digits];[root handleEvent:enter];NSCAssert(value==25000,@"mouse-selected numeric field accepts keyboard edit");
     [root applyOverlayOptions:@{@"position":@"top-left"}];NSRect before=root.panel.frame;
-    [root handleMouseEvent:mouseEvent(window,root.panel,NSMakePoint(100,12),NSEventTypeLeftMouseDown)];
+    [root handleMouseEvent:mouseEvent(window,root.panelContent,NSMakePoint(100,12),NSEventTypeLeftMouseDown)];
     NSCAssert([root handleMouseEvent:mouseEvent(window,root,NSMakePoint(1000,600),NSEventTypeLeftMouseDragged)],@"drag remains owned outside the panel");
     [root handleMouseEvent:mouseEvent(window,root,NSMakePoint(1000,600),NSEventTypeLeftMouseUp)];
     NSCAssert(!NSEqualRects(before,root.panel.frame) && [root.overlayOptions[@"position"] isEqual:@"free"],@"routed title drag moves panel");
     NSInteger beforeCalls=calls;state.ready=NO;[root updateState:state];
-    NSView *god=root.panel.subviews[DI2FeatureGod];click(window,root,god,NSMakePoint(244,10));
+    NSView *god=root.panelContent.subviews[DI2FeatureGod];click(window,root,god,NSMakePoint(244,10));
     NSCAssert(calls==beforeCalls,@"loading/network still blocks mouse cheat activation");
     state.ready=YES;[root updateState:state];[root applyOverlayOptions:@{@"mouse":@NO}];
     NSCAssert(![root handleMouseEvent:mouseEvent(window,god,NSMakePoint(244,10),NSEventTypeLeftMouseDown)],@"display-only mode passes clicks through");
@@ -65,7 +68,7 @@ static void testMouseRouting(void) {
     [root applyOverlayOptions:nil];
     NSCAssert(![root handleMouseEvent:mouseEvent(window,root,NSMakePoint(1000,600),NSEventTypeLeftMouseDown)]
         && ![root handleMouseEvent:mouseEvent(window,root,NSMakePoint(1000,600),NSEventTypeLeftMouseUp)],@"outside click and release stay with game");
-    [root handleMouseEvent:mouseEvent(window,root.panel,NSMakePoint(526,12),NSEventTypeLeftMouseDown)];
+    [root handleMouseEvent:mouseEvent(window,root.panelContent,NSMakePoint(526,12),NSEventTypeLeftMouseDown)];
     NSCAssert(!root.panelVisible && [root handleMouseEvent:mouseEvent(window,root,NSMakePoint(1000,600),NSEventTypeLeftMouseUp)],@"close click consumes release without leaking to gameplay");
     [root applyOverlayOptions:@{@"visible":@NO,@"badge":@YES}];click(window,root,root.badge,NSMakePoint(20,10));
     NSCAssert(root.panelVisible,@"badge click reopens overlay");
@@ -157,14 +160,11 @@ int main(int argc, const char *argv[]) {
         }
         if (argc == 2 && strcmp(argv[1], "--unit-test") == 0) {
             [NSApplication sharedApplication];
+            DI2ConfigureHotkeys(@[]); // Deterministic UI fixture; conflict cases have a separate suite.
             DI2OverlayRoot *root = [[DI2OverlayRoot alloc] initWithFrame:NSMakeRect(0,0,1100,720) version:@"test"];
-            NSMutableArray<NSView *> *views = [NSMutableArray arrayWithObject:root];
-            while (views.count) {
-                NSView *view = views.lastObject;
-                [views removeLastObject];
-                NSCAssert(view.constraints.count == 0 && ![view isKindOfClass:NSStackView.class], @"game overlay must not introduce Auto Layout");
-                [views addObjectsFromArray:view.subviews];
-            }
+            NSCAssert(root.constraints.count==0 && [root.panel isKindOfClass:DI2TrainerMaterial.class],@"manual root hosts a native material surface");
+            for(NSView *row in root.panelContent.subviews)
+                NSCAssert(row.constraints.count==0 && ![row isKindOfClass:NSStackView.class],@"trainer rows keep manual geometry; native material owns only its internal layout");
             NSCAssert(root.panelVisible && !root.panel.hidden && root.badge.hidden, @"initial visibility");
             NSCAssert([root hitTest:NSMakePoint(1000,600)] == nil, @"outside overlay is click-through");
             [root togglePanel:nil];
@@ -206,18 +206,60 @@ int main(int argc, const char *argv[]) {
             NSCAssert(received==6,@"F1–F5 and F12 commands dispatched");
             NSCAssert(root.panel.frame.size.width<=486.01 && root.panel.frame.size.height<=331.21,@"compact default footprint");
             NSUInteger rows=0;
-            for(NSView *row in root.panel.subviews) {
-                NSCAssert(NSContainsRect(root.panel.bounds,row.frame),@"all rows fit inside compact panel"); rows++;
+            for(NSView *row in root.panelContent.subviews) {
+                NSCAssert(NSContainsRect(root.panelContent.bounds,row.frame),@"all rows fit inside compact panel"); rows++;
             }
             NSCAssert(rows==26,@"all reference functions present");
+            DI2OverlayRoot *efficient=[[DI2OverlayRoot alloc]initWithFrame:root.frame version:@"redraw-test"];
+            DI2TrainerState *presentation=[DI2TrainerState new]; presentation.ready=YES;
+            [efficient updateState:presentation];
+            // Count invalidation requests instead of AppKit's needsDisplay flag:
+            // layer-backed views may immediately forward that flag to their layer.
+            Class rowClass=[efficient.panelContent.subviews[0] class], panelClass=efficient.panelContent.class;
+            SEL selector=@selector(setNeedsDisplay:);
+            IMP rowOriginal=class_getMethodImplementation(rowClass,selector);
+            IMP panelOriginal=class_getMethodImplementation(panelClass,selector);
+            NSMutableDictionary<NSNumber *,NSNumber *> *repaints=[NSMutableDictionary new];
+            __block NSUInteger panelRepaints=0;
+            IMP rowWatch=imp_implementationWithBlock(^(NSView *row,BOOL needed) {
+                NSUInteger index=[efficient.panelContent.subviews indexOfObjectIdenticalTo:row];
+                if(needed && index!=NSNotFound)repaints[@(index)]=@([repaints[@(index)] unsignedIntegerValue]+1);
+                ((void(*)(id,SEL,BOOL))rowOriginal)(row,selector,needed);
+            });
+            IMP panelWatch=imp_implementationWithBlock(^(NSView *panel,BOOL needed) {
+                if(needed && panel==efficient.panelContent)panelRepaints++;
+                ((void(*)(id,SEL,BOOL))panelOriginal)(panel,selector,needed);
+            });
+            class_replaceMethod(rowClass,selector,rowWatch,"v@:B");
+            class_replaceMethod(panelClass,selector,panelWatch,"v@:B");
+            @try {
+                for(NSUInteger tick=0;tick<100;tick++)[efficient updateState:presentation];
+                NSCAssert(panelRepaints==0 && repaints.count==0,@"100 unchanged polls request zero panel/row repaints");
+                presentation.features[DI2FeatureMoney].value=42000;
+                [efficient updateState:presentation];
+                NSCAssert(repaints.count==1 && [repaints[@(DI2FeatureMoney)] integerValue]==1,
+                    @"in-place numeric update repaints exactly its row");
+                presentation.features[DI2FeatureGod].wanted=YES; presentation.features[DI2FeatureGod].active=YES;
+                [efficient updateState:presentation];
+                NSCAssert([efficient.panelContent.subviews[DI2FeatureGod].accessibilityValue boolValue]
+                    && panelRepaints==1,@"mutable active state updates accessibility and active-count summary");
+                presentation.message=@"Changed message";[efficient updateState:presentation];
+                NSCAssert(panelRepaints==2,@"message changes invalidate panel");
+                presentation.ready=NO;[efficient updateState:presentation];
+                NSCAssert(!efficient.panelContent.subviews[DI2FeatureGod].accessibilityEnabled,@"loading/network readiness still disables rows");
+            } @finally {
+                class_replaceMethod(rowClass,selector,rowOriginal,"v@:B");
+                class_replaceMethod(panelClass,selector,panelOriginal,"v@:B");
+                imp_removeBlock(rowWatch);imp_removeBlock(panelWatch);
+            }
             __block NSInteger features=0;
             for(NSInteger i=0;i<DI2FeatureCount;i++) {
                 const DI2FeatureInfo *info=DI2FeatureInfoAt(i);
                 for(NSInteger j=0;j<i;j++) NSCAssert(info->key!=DI2FeatureInfoAt(j)->key || info->modifiers!=DI2FeatureInfoAt(j)->modifiers,@"unique feature hotkeys");
                 NSInteger before=features;
                 root.featureHandler=^(DI2Feature actual){ NSCAssert(actual==i,@"catalog hotkey matches feature"); features++; };
-                NSEventModifierFlags flags=(info->modifiers & 1 ? NSEventModifierFlagShift : 0) | (info->modifiers & 2 ? NSEventModifierFlagOption : 0);
-                NSEvent *key=[NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint modifierFlags:flags timestamp:0 windowNumber:0 context:nil characters:@"" charactersIgnoringModifiers:@"" isARepeat:NO keyCode:info->key];
+                DI2HotkeyBinding *binding=DI2HotkeyAt(i);
+                NSEvent *key=[NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint modifierFlags:binding.modifiers timestamp:0 windowNumber:0 context:nil characters:@"" charactersIgnoringModifiers:@"" isARepeat:NO keyCode:binding.keyCode];
                 [root handleEvent:key];
                 NSCAssert(features==before+(info->implemented ? 1 : 0),@"unsupported rows never dispatch cheats");
             }
@@ -338,7 +380,16 @@ int main(int argc, const char *argv[]) {
             NSEvent *heldCaret=[NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint modifierFlags:NSEventModifierFlagCommand timestamp:0 windowNumber:0 context:nil characters:@"" charactersIgnoringModifiers:@"" isARepeat:YES keyCode:10];
             [hotkeyRoot handleEvent:heldCaret];NSCAssert(!hotkeyRoot.panelVisible,@"fallback key repeat does not reopen panel");
             NSCAssert(ready.features[DI2FeatureGod].active,@"shortcut routes never reset active cheats");
+            DI2OverlayRoot *editorKeys=[[DI2OverlayRoot alloc]initWithFrame:root.frame version:@"editor-hotkeys"];
+            [editorKeys updateState:ready];[editorKeys editFeature:DI2FeatureMoney];
+            NSEvent *quit=[NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint modifierFlags:NSEventModifierFlagCommand timestamp:0 windowNumber:0 context:nil characters:@"q" charactersIgnoringModifiers:@"q" isARepeat:NO keyCode:12];
+            NSCAssert(![editorKeys handleEvent:quit],@"numeric editor does not swallow a Mac app command");
+            __block NSUInteger editorStops=0;
+            editorKeys.actionHandler=^(DI2TrainerAction action){NSCAssert(action==DI2TrainerDisableAll,@"editor emergency command");editorStops++;};
+            NSCAssert([editorKeys handleEvent:f12] && editorStops==1,@"all-off still works while editing a numeric field");
+            [editorKeys handleEvent:escape];NSCAssert(!editorKeys.panelVisible,@"all-off cancelled numeric editing so Escape closes the panel");
             testMouseRouting();
+            DI2PresentationRunTests();
             puts("Overlay state, cursor controls, click-through, resize and hotkey tests passed.");
             return 0;
         }

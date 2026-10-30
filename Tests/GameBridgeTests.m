@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #import "GameBridge.h"
 #import "GameAccess.h"
+#import "SelectionSettings.h"
 #include <limits.h>
 #include <math.h>
 @interface DI2GameBridge (Testing)
@@ -9,6 +10,7 @@
 - (DI2TrainerState *)testFeature:(DI2Feature)feature;
 - (DI2TrainerState *)testValue:(double)value feature:(DI2Feature)feature;
 @end
+void DI2TestSelectionSettings(void);
 void DI2TestExtraFeatures(void);
 void DI2TestOverlayInput(void);
 #define COUNT 31
@@ -94,6 +96,7 @@ static void gameThreadCall(void (^block)(void),NSArray *modes,bool wait) { (void
 static void runJob(void) { NSCAssert(jobs.count==1,@"one job in flight");void (^block)(void)=jobs.firstObject;[jobs removeObjectAtIndex:0];block();[NSRunLoop.mainRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.03]]; }
 int main(void) {
  @autoreleasepool {
+    DI2TestSelectionSettings();
     DI2GameAPI unsupported;NSCAssert(!DI2LoadGameAPI(&unsupported),@"synthetic host rejects production ABI");
     for(int i=0;i<COUNT;i++) { objects[i]=calloc(1,0x1600);live[i]=YES;storePointer(objects[i],0x10,&classes[i==9 || i==26 ? 8 : i==13 ? 12 : i==24 ? 0 : i==27 ? 19 : i==28 ? 20 : i==29 ? 7 : i==30 ? 23 : i]); }
     world=objects[23];currentPlayer=objects[0];heldItem(objects[6]);currentAmmo=objects[8];currentSpread=objects[19];currentRecoil=objects[20];
@@ -292,6 +295,35 @@ int main(void) {
     [bridge testUpdate:DI2TrainerHealth];currentPlayer=NULL;state=[bridge testUpdate:DI2TrainerDisableAll];
     NSCAssert(!state.features[DI2FeatureGod].wanted,@"F12 works on the same update that detects a loading transition");
     currentPlayer=objects[0];[bridge testUpdate:DI2TrainerPoll];[bridge testUpdate:DI2TrainerHealth];live[2]=NO;int removedBefore=removes;[bridge testUpdate:DI2TrainerDisableAll];NSCAssert(removes==removedBefore,@"dead weak owner never dereferenced");
+    // Simulate a fresh launch: restore intent, never a queued native action.
+    live[2]=YES;solo=YES;world=objects[23];currentPlayer=NULL;
+    DI2GameBridge *restored=[[DI2GameBridge alloc]initWithTestAPI:api];
+    NSDictionary *saved=@{@"features":@{@"0":@{@"wanted":@YES},@"5":@{@"wanted":@YES,@"value":@3},
+        @"13":@{@"wanted":@YES,@"value":@42},@"22":@{@"wanted":@YES},@"24":@{@"wanted":@YES}}};
+    int oldGods=gods;int32_t oldCash=cash,oldXP=xp;float oldFury=fury;
+    [restored restoreSelection:saved];
+    NSCAssert(gods==oldGods && !restored.state.features[0].active && restored.state.features[0].wanted,@"restore intent performs no native call");
+    state=[restored testUpdate:DI2TrainerPoll];
+    NSCAssert(!state.ready && !state.selectionCanBeSaved && state.features[0].wanted,@"initial loading retains saved intent without overwriting preferences");
+    currentPlayer=objects[0];state=[restored testUpdate:DI2TrainerPoll];
+    NSCAssert(state.ready && state.selectionCanBeSaved && state.features[0].active && state.features[5].active
+        && state.features[5].value==3 && gods==oldGods+1,@"selection applies only after validated solo context");
+    NSCAssert(cash==oldCash && xp==oldXP && fury==oldFury,@"restored money/XP/fury actions never execute");
+    solo=NO;state=[restored testUpdate:DI2TrainerPoll];
+    NSCAssert(state.selectionCanBeSaved && !state.features[0].wanted,@"network reset is saved");
+    solo=YES;state=[restored testUpdate:DI2TrainerPoll];
+    NSCAssert(!state.features[0].active && !state.features[5].wanted,@"network exit never restores previous preset");
+    currentPlayer=NULL;
+    DI2GameBridge *stopped=[[DI2GameBridge alloc]initWithTestAPI:api];[stopped restoreSelection:saved];
+    state=[stopped testUpdate:DI2TrainerDisableAll];
+    NSCAssert(!state.features[0].wanted && state.selectionCanBeSaved,@"explicit all-off while loading persists immediately");
+    DI2GameBridge *next=[[DI2GameBridge alloc]initWithTestAPI:api];[next restoreSelection:DI2SelectionFromState(state)];
+    currentPlayer=objects[0];state=[next testUpdate:DI2TrainerPoll];
+    NSCAssert(!state.features[0].wanted && !state.features[0].active,@"next launch respects saved all-off");
+    DI2GameBridge *disabled=[[DI2GameBridge alloc]initWithTestAPI:api];[disabled restoreSelection:nil];
+    state=[disabled testUpdate:DI2TrainerPoll];
+    for(DI2FeatureState *feature in state.features) NSCAssert(!feature.wanted,@"restore option off starts with no cheat requests");
+    puts("Selection startup checks passed: loading/solo restore, no one-shots, network clear, all-off during loading and disabled restore.");
     uint8_t byte;NSCAssert(!DI2ReadMemory((void *)1,&byte,1) && !DI2WriteByte((void *)1,0,1) && !DI2WriteFloat((void *)1,0,1),@"unmapped pages rejected");
     for(int i=0;i<COUNT;i++)free(objects[i]);
     DI2TestExtraFeatures();

@@ -5,6 +5,8 @@
 #import "OverlaySettings.h"
 #import "GameEdition.h"
 #import "LauncherView.h"
+#import "OverlayShortcuts.h"
+#import "SelectionSettings.h"
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 static NSString *const uncutPath = @"/Applications/Dead Island 2 Uncut.app";
@@ -48,7 +50,9 @@ static BOOL uncutAvailable(void) {
 @property(nonatomic, strong) NSButton *showOverlay, *showBadge, *allowDragging, *mouseInput;
 @property(nonatomic, strong) NSPopUpButton *position;
 @property(nonatomic, copy) NSDictionary *options;
-@property(nonatomic, strong) id settingsObserver;
+@property(nonatomic, strong) id settingsObserver, selectionObserver;
+@property(nonatomic, copy) NSString *launchedProfile, *pendingSelectionMessage;
+@property(nonatomic) BOOL launching;
 @property(nonatomic) DI2GameEdition edition;
 @property(nonatomic, strong) NSSegmentedControl *editionPicker;
 @property(nonatomic, strong) DI2LauncherView *launcherView;
@@ -87,19 +91,50 @@ static BOOL uncutAvailable(void) {
             [NSUserDefaults.standardUserDefaults setObject:strongSelf.options forKey:DI2OverlayPreferencesKey];
             [strongSelf updateOverlayControls];
             strongSelf.status.stringValue=[strongSelf.options[@"visible"] boolValue]
-                ? @"Trainer aktiv · Overlay sichtbar · ⌘ + ^ zum Verbergen."
-                : @"Trainer aktiv · Overlay verborgen · Cheats/F-Tasten bleiben an · ⌘ + ^ zum Anzeigen.";
+                ? [NSString stringWithFormat:@"Trainer aktiv · Overlay sichtbar · %@ zum Verbergen.",DI2HotkeyAt(DI2HotkeyPanel).label]
+                : [NSString stringWithFormat:@"Trainer aktiv · Overlay verborgen · Cheats bleiben an · %@ zum Anzeigen.",DI2HotkeyAt(DI2HotkeyPanel).label];
         }];
+    self.selectionObserver=[NSDistributedNotificationCenter.defaultCenter addObserverForName:DI2SelectionChangedNotification
+        object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *event) {
+            TrainerDelegate *owner=weakSelf;
+            if (owner.launching) {
+                // The first game report can arrive before NSWorkspace's completion.
+                if ([event.object isKindOfClass:NSString.class] && [event.object length]<=16384)
+                    owner.pendingSelectionMessage=event.object;
+                return;
+            }
+            [owner receiveSelectionMessage:event.object];
+        }];
+}
+- (void)receiveSelectionMessage:(id)message {
+    if (!self.game || self.game.terminated) return;
+    NSDictionary *selection=DI2SelectionMessageSelection(message,self.token,self.launchedProfile,self.game.processIdentifier);
+    if (!selection) return;
+    [NSUserDefaults.standardUserDefaults setObject:selection forKey:DI2SelectionPreferencesKey(self.launchedProfile)];
+    [self updateSelectionHint];
+}
+- (void)updateSelectionHint {
+    BOOL enabled=self.launcherView.restoreCheats.state==NSControlStateValueOn;
+    id saved=[NSUserDefaults.standardUserDefaults objectForKey:DI2SelectionPreferencesKey(DI2EditionKey(self.edition))];
+    NSString *hint=!enabled ? @"Cheats starten ohne gespeicherte Auswahl."
+        : saved ? @"Gespeicherte Auswahl wird nach dem Laden aktiviert."
+        : @"Noch keine gespeicherte Auswahl für diese Spielversion.";
+    [self.launcherView showSelectionHint:hint];
+}
+- (void)changeSelectionRestore:(id)sender {
+    (void)sender;
+    [NSUserDefaults.standardUserDefaults setBool:self.launcherView.restoreCheats.state==NSControlStateValueOn forKey:DI2SelectionRestorePreferencesKey];
+    [self updateSelectionHint];
 }
 - (void)buildLauncher {
     self.window=[[NSWindow alloc]initWithContentRect:NSMakeRect(0,0,520,564)
-        styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskFullSizeContentView
+        styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable
         backing:NSBackingStoreBuffered defer:NO];
     self.window.title=@"Dead Island 2 Trainer"; self.window.releasedWhenClosed=NO;
-    self.window.titleVisibility=NSWindowTitleHidden; self.window.titlebarAppearsTransparent=YES;
-    self.window.movableByWindowBackground=YES; self.window.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
-    self.window.backgroundColor=[NSColor colorWithWhite:0.075 alpha:1];
-    NSString *version=[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"0.6.5";
+    self.window.titleVisibility=NSWindowTitleVisible; self.window.titlebarAppearsTransparent=NO;
+    self.window.movableByWindowBackground=YES;
+    self.window.opaque=YES; self.window.backgroundColor=NSColor.windowBackgroundColor;
+    NSString *version=[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"0.6.10";
     self.launcherView=[[DI2LauncherView alloc]initWithFrame:NSMakeRect(0,0,520,564) version:version];
     self.window.contentView=self.launcherView;
     self.editionPicker=self.launcherView.editionPicker; self.editionPicker.target=self; self.editionPicker.action=@selector(changeEdition:);
@@ -109,10 +144,15 @@ static BOOL uncutAvailable(void) {
     self.startUncut=self.launcherView.uncutStart; self.startUncut.target=self; self.startUncut.action=@selector(startUncutGame:);
     self.launcherView.settingsButton.target=self; self.launcherView.settingsButton.action=@selector(openSettings:);
     self.status=self.launcherView.status;
-    self.settingsWindow=[[NSWindow alloc]initWithContentRect:NSMakeRect(0,0,620,356)
+    id restore=[NSUserDefaults.standardUserDefaults objectForKey:DI2SelectionRestorePreferencesKey];
+    self.launcherView.restoreCheats.state=(restore==nil || [restore boolValue]) ? NSControlStateValueOn : NSControlStateValueOff;
+    self.launcherView.restoreCheats.target=self;self.launcherView.restoreCheats.action=@selector(changeSelectionRestore:);
+    self.settingsWindow=[[NSWindow alloc]initWithContentRect:NSMakeRect(0,0,620,426)
         styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable backing:NSBackingStoreBuffered defer:NO];
     self.settingsWindow.title=@"Overlay-Einstellungen"; self.settingsWindow.releasedWhenClosed=NO;
-    self.settingsWindow.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+    self.settingsWindow.opaque=YES; self.settingsWindow.backgroundColor=NSColor.windowBackgroundColor;
+    NSView *settingsContent=[[NSView alloc]initWithFrame:NSMakeRect(0,0,620,426)];
+    self.settingsWindow.contentView=DI2LauncherSurface(settingsContent,16,YES);
     self.showOverlay=[NSButton checkboxWithTitle:@"Overlay anzeigen – beim Verbergen bleiben Cheats aktiv" target:self action:@selector(changeOverlayOptions:)];
     self.showBadge=[NSButton checkboxWithTitle:@"Beim Verbergen ein kleines Trainer-Symbol anzeigen" target:self action:@selector(changeOverlayOptions:)];
     self.mouseInput=[NSButton checkboxWithTitle:@"Maus im sichtbaren Overlay freigeben (beim Öffnen automatisch)" target:self action:@selector(changeOverlayOptions:)];
@@ -130,17 +170,20 @@ static BOOL uncutAvailable(void) {
     self.gameLocation=[NSTextField labelWithString:editionPath(self.edition)];
     self.gameLocation.font=[NSFont systemFontOfSize:10]; self.gameLocation.textColor=NSColor.secondaryLabelColor;
     self.gameLocation.lineBreakMode=NSLineBreakByTruncatingMiddle;
+    NSTextField *hotkeyInfo=[NSTextField wrappingLabelWithString:[@"⌃ Control · ⌥ Option · ⇧ Umschalt · ⌘ Command\n" stringByAppendingString:DI2HotkeyConflictSummary()]];
+    hotkeyInfo.font=[NSFont systemFontOfSize:11];hotkeyInfo.textColor=NSColor.secondaryLabelColor;
     NSButton *done=[NSButton buttonWithTitle:@"Fertig" target:self action:@selector(closeSettings:)]; done.keyEquivalent=@"\r";
-    NSStackView *stack=[NSStackView stackViewWithViews:@[self.showOverlay,self.showBadge,self.mouseInput,self.allowDragging,positionRow,hint,self.gameLocation,done]];
+    NSStackView *stack=[NSStackView stackViewWithViews:@[self.showOverlay,self.showBadge,self.mouseInput,self.allowDragging,positionRow,hint,hotkeyInfo,self.gameLocation,done]];
     stack.orientation=NSUserInterfaceLayoutOrientationVertical; stack.alignment=NSLayoutAttributeLeading; stack.spacing=15; stack.translatesAutoresizingMaskIntoConstraints=NO;
-    [self.settingsWindow.contentView addSubview:stack];
-    for(NSTextField *label in @[hint,self.gameLocation]){label.preferredMaxLayoutWidth=564;[label.widthAnchor constraintEqualToConstant:564].active=YES;}
-    [NSLayoutConstraint activateConstraints:@[[stack.leadingAnchor constraintEqualToAnchor:self.settingsWindow.contentView.leadingAnchor constant:28],[stack.trailingAnchor constraintEqualToAnchor:self.settingsWindow.contentView.trailingAnchor constant:-28],[stack.topAnchor constraintEqualToAnchor:self.settingsWindow.contentView.topAnchor constant:24]]];
+    [settingsContent addSubview:stack];
+    for(NSTextField *label in @[hint,hotkeyInfo,self.gameLocation]){label.preferredMaxLayoutWidth=564;[label.widthAnchor constraintEqualToConstant:564].active=YES;}
+    [NSLayoutConstraint activateConstraints:@[[stack.leadingAnchor constraintEqualToAnchor:settingsContent.leadingAnchor constant:28],[stack.trailingAnchor constraintEqualToAnchor:settingsContent.trailingAnchor constant:-28],[stack.topAnchor constraintEqualToAnchor:settingsContent.topAnchor constant:24]]];
     [self updateOverlayControls];
 }
 - (void)openSettings:(id)sender { (void)sender; if(!self.settingsWindow.isVisible)[self.settingsWindow center];[self.settingsWindow makeKeyAndOrderFront:nil]; }
 - (void)closeSettings:(id)sender { (void)sender; [self.settingsWindow orderOut:nil]; }
 - (void)refreshInstallation {
+    [self updateSelectionHint];
     self.gameLocation.stringValue=editionPath(self.edition);self.gameLocation.toolTip=self.gameLocation.stringValue;
     BOOL running=self.game && !self.game.terminated;
     self.editionPicker.enabled=!running;self.chooseGame.enabled=!running;
@@ -205,7 +248,7 @@ static BOOL uncutAvailable(void) {
         } @catch (NSException *exception) {
             (void)exception; self.status.stringValue=@"Einstellungen gespeichert. Live-Übernahme nicht verfügbar; gilt beim nächsten Trainer-Start.";
         }
-    } else self.status.stringValue=@"Overlay-Einstellungen gespeichert. ⌘ + ^ zeigt auch ein vollständig verborgenes Overlay wieder an.";
+    } else self.status.stringValue=[NSString stringWithFormat:@"Overlay-Einstellungen gespeichert. %@ zeigt das verborgene Overlay wieder an.",DI2HotkeyAt(DI2HotkeyPanel).label];
 }
 - (void)resetOverlayPosition:(id)sender {
     (void)sender;
@@ -241,6 +284,9 @@ static BOOL uncutAvailable(void) {
     self.options=DI2InitialOverlayOptions(self.options);
     [self updateOverlayControls];
     self.token = NSUUID.UUID.UUIDString;
+    self.launchedProfile=DI2EditionKey(self.edition);
+    id selection=self.launcherView.restoreCheats.state==NSControlStateValueOn
+        ? [NSUserDefaults.standardUserDefaults objectForKey:DI2SelectionPreferencesKey(self.launchedProfile)] : nil;
     NSWorkspaceOpenConfiguration *configuration = NSWorkspaceOpenConfiguration.configuration;
     configuration.activates = YES;
     configuration.createsNewApplicationInstance = YES;
@@ -249,24 +295,29 @@ static BOOL uncutAvailable(void) {
         @"DI2_TRAINER_TARGET": [gamePath stringByAppendingPathComponent:@"Contents/MacOS/DeadIsland2"],
         @"DI2_TRAINER_SESSION": self.token,
         @"DI2_TRAINER_EDITION":DI2EditionKey(self.edition),
-        @"DI2_TRAINER_OVERLAY_OPTIONS": DI2EncodeOverlayOptions(self.options)
+        @"DI2_TRAINER_OVERLAY_OPTIONS": DI2EncodeOverlayOptions(self.options),
+        @"DI2_TRAINER_CHEAT_SELECTION": DI2EncodeCheatSelection(selection)
     } mutableCopy];
     if (self.edition==DI2EditionSteam) { environment[@"SteamAppId"]=@"934700";environment[@"SteamGameId"]=@"934700"; }
     configuration.environment=environment;
     self.start.enabled = NO; self.startUncut.enabled=NO;
     self.editionPicker.enabled=NO;self.chooseGame.enabled=NO;
     self.status.stringValue = @"Spielstart wird angefordert …";
+    self.launching=YES;self.pendingSelectionMessage=nil;
     [NSWorkspace.sharedWorkspace openApplicationAtURL:[NSURL fileURLWithPath:gamePath]
         configuration:configuration completionHandler:^(NSRunningApplication *application, NSError *error) {
             dispatch_async(dispatch_get_main_queue(), ^{
+                self.launching=NO;
                 if (error || !application) {
+                    self.pendingSelectionMessage=nil;
                     [self refreshInstallation];
                     self.status.stringValue = [NSString stringWithFormat:@"Spielstart fehlgeschlagen: %@", error.localizedDescription ?: @"Kein Prozess gestartet."];
                     return;
                 }
                 self.game = application;
+                [self receiveSelectionMessage:self.pendingSelectionMessage];self.pendingSelectionMessage=nil;
                 [self refreshInstallation];
-                self.status.stringValue = [NSString stringWithFormat:@"Spiel gestartet · PID %d · Overlay %@ · ⌘ + ^", application.processIdentifier,[self.options[@"visible"] boolValue] ? @"sichtbar" : @"verborgen"];
+                self.status.stringValue = [NSString stringWithFormat:@"Spiel gestartet · PID %d · Overlay %@ · %@", application.processIdentifier,[self.options[@"visible"] boolValue] ? @"sichtbar" : @"verborgen",DI2HotkeyAt(DI2HotkeyPanel).label];
                 [self.processTimer invalidate];
                 self.processTimer = [NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer) {
                     if (self.game.terminated) {
@@ -291,6 +342,7 @@ static BOOL uncutAvailable(void) {
 - (void)applicationWillTerminate:(NSNotification *)notification {
     (void)notification;
     if (self.settingsObserver) [NSDistributedNotificationCenter.defaultCenter removeObserver:self.settingsObserver];
+    if (self.selectionObserver) [NSDistributedNotificationCenter.defaultCenter removeObserver:self.selectionObserver];
     [self.processTimer invalidate];
 }
 @end

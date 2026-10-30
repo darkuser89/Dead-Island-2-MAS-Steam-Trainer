@@ -6,10 +6,12 @@
 #import <mach-o/dyld.h>
 #import <Carbon/Carbon.h>
 #import "GameEdition.h"
+#import "SelectionSettings.h"
 
 static os_log_t runtimeLog;
 static NSMutableArray<DI2OverlayRoot *> *roots;
-static NSString *sessionToken;
+static NSString *sessionToken, *selectionProfile;
+static NSDictionary *lastSelection;
 static id monitor;
 static NSTimer *attachmentTimer;
 static NSTimer *gameplayTimer;
@@ -64,11 +66,31 @@ static void updateKeyboardShortcuts(void) {
     }
     for (NSInteger i=0;i<DI2ShortcutCount;i++) {
         EventHotKeyID identifier={0x44325452,(UInt32)i+1};
-        UInt32 modifiers=cmdKey|(i==DI2ShortcutMouse ? optionKey : 0);
-        OSStatus status=RegisterEventHotKey(10,modifiers,identifier,GetApplicationEventTarget(),kEventHotKeyNoOptions,&shortcutRefs[i]);
+        NSInteger index=i==DI2ShortcutPanel ? DI2HotkeyPanel : DI2HotkeyMouse;
+        DI2HotkeyBinding *binding=DI2HotkeyAt(index);
+        if(!binding.available)continue;
+        NSEventModifierFlags flags=binding.modifiers;
+        UInt32 modifiers=(flags&NSEventModifierFlagCommand ? cmdKey : 0)|(flags&NSEventModifierFlagOption ? optionKey : 0)
+            |(flags&NSEventModifierFlagShift ? shiftKey : 0)|(flags&NSEventModifierFlagControl ? controlKey : 0);
+        OSStatus status=RegisterEventHotKey(binding.keyCode,modifiers,identifier,GetApplicationEventTarget(),kEventHotKeyNoOptions,&shortcutRefs[i]);
+        if(status==eventHotKeyExistsErr) {
+            DI2BlockHotkey(index);
+            for(DI2OverlayRoot *root in roots)[root refreshHotkeyLabels];
+        }
         [shortcuts setRegistered:status==noErr && shortcutRefs[i]!=NULL shortcut:i];
         os_log(runtimeLog,"Native shortcut %ld registration status=%d",(long)i,(int)status);
     }
+}
+static void refreshKeyboardShortcuts(void) {
+    // Release prior native registrations before applying a fresh OS snapshot.
+    for(NSInteger i=0;i<DI2ShortcutCount;i++) {
+        if(shortcutRefs[i]) { UnregisterEventHotKey(shortcutRefs[i]);shortcutRefs[i]=NULL; }
+        [shortcuts setRegistered:NO shortcut:i];
+    }
+    shortcutsEnabled=NO;shortcuts.enabled=NO;
+    DI2ReloadSystemHotkeys();
+    for(DI2OverlayRoot *root in roots)[root refreshHotkeyLabels];
+    updateKeyboardShortcuts();
 }
 static void updateOverlayInput(void) {
     updateKeyboardShortcuts();
@@ -84,6 +106,20 @@ static void postOverlayOptions(void) {
             object:DI2OverlayMessage(overlayOptions,sessionToken,getpid()) userInfo:nil deliverImmediately:YES];
     } @catch (NSException *exception) {
         os_log(runtimeLog,"Optional overlay settings notification unavailable: %{public}s",exception.name.UTF8String);
+    }
+}
+
+static void postSelection(DI2TrainerState *state) {
+    if (!sessionToken.length || !selectionProfile.length || !state.selectionCanBeSaved) return;
+    NSDictionary *selection=DI2SelectionFromState(state);
+    if ([selection isEqual:lastSelection]) return;
+    lastSelection=selection;
+    @try {
+        [NSDistributedNotificationCenter.defaultCenter postNotificationName:DI2SelectionChangedNotification
+            object:DI2SelectionMessage(selection,sessionToken,selectionProfile,getpid()) userInfo:nil deliverImmediately:YES];
+    } @catch (NSException *exception) {
+        lastSelection=nil; // Retry on the next poll if optional IPC failed.
+        os_log(runtimeLog,"Optional selection notification unavailable: %{public}s",exception.name.UTF8String);
     }
 }
 
@@ -125,7 +161,7 @@ static void attachToGameWindow(void) {
     NSView *content = candidate.contentView;
     for (DI2OverlayRoot *root in roots) {
         if (root.superview == content) {
-            root.frame = content.bounds;
+            if(!NSEqualRects(root.frame,content.bounds))root.frame=content.bounds;
             return;
         }
     }
@@ -158,6 +194,7 @@ __attribute__((constructor)) static void startOverlay(void) {
         runtimeLog = os_log_create("local.deadisland2.trainer", "overlay");
         if (!supportedProcess()) { os_log_error(runtimeLog, "Unsupported process; overlay not installed"); return; }
         sessionToken = [NSProcessInfo.processInfo.environment[@"DI2_TRAINER_SESSION"] copy];
+        selectionProfile=[NSProcessInfo.processInfo.environment[@"DI2_TRAINER_EDITION"] copy];
         overlayOptions=DI2InitialOverlayOptions(DI2DecodeOverlayOptions(NSProcessInfo.processInfo.environment[@"DI2_TRAINER_OVERLAY_OPTIONS"]));
         os_log(runtimeLog, "Trainer overlay library loaded in pid=%{public}d", getpid());
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -169,7 +206,7 @@ __attribute__((constructor)) static void startOverlay(void) {
                 else if (action==DI2ShortcutMouse) [root toggleMouseInteraction];
             };
             activeObserver=[NSNotificationCenter.defaultCenter addObserverForName:NSApplicationDidBecomeActiveNotification
-                object:NSApp queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *event) { (void)event; updateKeyboardShortcuts(); }];
+                object:NSApp queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *event) { (void)event; refreshKeyboardShortcuts(); }];
             inactiveObserver=[NSNotificationCenter.defaultCenter addObserverForName:NSApplicationDidResignActiveNotification
                 object:NSApp queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *event) { (void)event; updateKeyboardShortcuts(); }];
             if (sessionToken.length) settingsObserver=[NSDistributedNotificationCenter.defaultCenter
@@ -183,8 +220,10 @@ __attribute__((constructor)) static void startOverlay(void) {
                     postOverlayOptions();
                 }];
             gameplay = [DI2GameBridge new];
+            [gameplay restoreSelection:DI2DecodeCheatSelection(NSProcessInfo.processInfo.environment[@"DI2_TRAINER_CHEAT_SELECTION"])];
             gameplay.stateChanged = ^(DI2TrainerState *state) {
                 for (DI2OverlayRoot *root in roots) [root updateState:state];
+                postSelection(state);
             };
             NSEventMask mask=NSEventMaskKeyDown|NSEventMaskLeftMouseDown|NSEventMaskLeftMouseDragged|NSEventMaskLeftMouseUp;
             monitor = [NSEvent addLocalMonitorForEventsMatchingMask:mask handler:^NSEvent *(NSEvent *event) {

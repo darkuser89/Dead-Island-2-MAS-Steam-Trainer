@@ -42,8 +42,10 @@ nicht überschrieben. Keine Spiele oder Zugangsdaten für die CI hinterlegen.
   Weak-Referenzen vor nativen Aufrufen validieren.
 - Wiederherstellung, Objektwechsel, Ladepausen und Netzwerksperre erhalten.
   Einmalaktionen dürfen nach einem Kontextwechsel nicht erneut abgespielt werden.
-- GameThread-/AppKit-Grenzen beachten. Im Spielfenster kein Auto Layout einführen;
-  das Spiel kann seine Fenster auch vom GameThread verändern.
+- GameThread-/AppKit-Grenzen beachten. Eigene Overlay-Geometrie und Zeilen manuell
+  halten; nur der native Material-Host verwaltet sein internes AppKit-Layout.
+  Ausschließlich den Inhalt skalieren, siehe `docs/UI.md`. Das Spiel kann seine
+  Fenster auch vom GameThread verändern.
 - Regressionstests sollen Fehler und Grenzen prüfen. Synthetische Tests und
   echte Ingame-Beobachtungen im Änderungsbericht ausdrücklich unterscheiden.
 

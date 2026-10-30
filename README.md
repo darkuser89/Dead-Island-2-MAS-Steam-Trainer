@@ -2,7 +2,7 @@
 
 <img src="Resources/AppIcon.png" width="128" height="128" alt="Trainer-Icon mit Schädel und orangefarbenem Schalter">
 
-Externer Einzelspieler-Trainer **0.6.5** für **Dead Island 2 0.6.4** auf
+Externer Einzelspieler-Trainer **0.6.10** für **Dead Island 2 0.6.4** auf
 Apple Silicon. Unterstützt die Mac-App-Store- und Steam-Version mit einem
 kompakten Ingame-Overlay und 26 Bedienelementen.
 
@@ -21,6 +21,25 @@ vorhandenen externen Uncut-Helfer und ist nur bei MAS mit verfügbarem Helfer ak
 zugeordnet. Das **Zahnrad** oder **⌘ + ,** öffnet die vorhandenen Overlay-Optionen
 und Positionsvorgaben in einem eigenen Fenster.
 Der Steam-Client bleibt über **Steam öffnen** in der Steam-Spielkarte erreichbar.
+
+Auf macOS 26 oder neuer verwendet der Launcher native Liquid-Glass-Flächen und
+Systemknöpfe; die Glasflächen teilen sich einen Container. Die Einstellungen
+verwenden ebenfalls das Systemmaterial. Auf macOS 14/15 sowie bei Builds mit
+älteren SDKs steht eine native Materialdarstellung bereit. Helle/dunkle Darstellung
+und die Systemeinstellung zur reduzierten Transparenz werden durch AppKit behandelt.
+Launcher, Einstellungen und Ingame-Overlay verwenden den gemeinsamen
+Material-Wrapper aus der Mac-Trainer-Vorlage 1.1. Die native Glasfläche behält
+normale Koordinaten; beim Overlay wird nur ihr Inhalt skaliert. Reduzierte
+Transparenz oder erhöhter Kontrast wählen eine deckende Fläche und werden auch
+bei Änderungen während der Laufzeit berücksichtigt. Der Launcher verwendet eine
+normale sichtbare macOS-Titelleiste mit System-Fensterhintergrund.
+
+Die Overlay-Anzeige aktualisiert Zeichenanforderungen und Bedienungstexte nur
+bei Änderungen. Verborgene Overlays behalten ausschließlich den neuesten Zustand;
+beim Öffnen wird dieser sofort dargestellt. Sichtbare Zeilen besitzen unabhängige
+Darstellungskopien, damit auch Änderungen am selben Zustandsobjekt erkannt werden. Im synthetischen Test verursachen 100 unveränderte Statusabfragen
+keine neuen Zeichenanforderungen; eine Geldwertänderung aktualisiert genau ihre
+Zeile. Eine höhere Ingame-Bildrate wurde damit nicht nachgewiesen.
 
 ## Voraussetzungen
 
@@ -90,8 +109,8 @@ ein dauerhaftes GitHub-Release:
 3. Passendes Tag setzen und pushen, zum Beispiel für diesen Stand:
 
    ```sh
-   git tag v0.6.5
-   git push origin v0.6.5
+   git tag v0.6.10
+   git push origin v0.6.10
    ```
 
 Tag und App-Version müssen exakt übereinstimmen. Bereits veröffentlichte Releases
@@ -110,7 +129,7 @@ nicht durchgeführt gemeldet. Echte Ingame-Tests ersetzt der Workflow nicht.
 Das gleiche geprüfte Paket kann lokal erstellt werden:
 
 ```sh
-python3 script/package_release.py --build-dir "$DI2_TRAINER_BUILD_DIR" --expected-tag v0.6.5
+python3 script/package_release.py --build-dir "$DI2_TRAINER_BUILD_DIR" --expected-tag v0.6.10
 ```
 
 Es entsteht im separaten Buildordner unter `Release/`. Das Skript prüft
@@ -147,16 +166,16 @@ Der Trainer allein ändert keine USK-Einstellung und verspricht keine iCloud-Fun
 - **⌘ + ^**: Overlay anzeigen/verbergen; beim Öffnen wird die Maus automatisch freigegeben. Aktive Schalter bleiben an.
 - **⌘⌥ + ^**: optional Mausbedienung umschalten, ohne das Panel zu verbergen. Beim nächsten Öffnen ist die Maus wieder frei.
 - **Esc** oder **×**: Panel schließen und Spielsteuerung zurückgeben.
-- **F12**: alle Schalter und ausstehenden Spielaktionen ausschalten, auch beim Laden.
+- **Alles aus**: aktuelle Belegung im Launcher/Overlay; bei erkanntem F12-Systemkonflikt wird meist **Control (⌃) + F12** verwendet. Funktioniert auch beim Laden und während einer Zahleneingabe.
 - **− / +** in der Kopfzeile: Größe ändern; **▾**: auf die Kopfzeile einklappen.
 - Titelleiste ziehen: Position ändern, sofern im Launcher freigegeben.
 
 Standardgröße: ungefähr **486 × 331 Punkte**. Position, Größe, Sichtbarkeit,
 Mausbedienung und optionales Badge lassen sich im Launcher einstellen. Diese
 Anzeigeoptionen werden gespeichert; jeder neue Spielprozess startet jedoch mit
-verborgenem Panel und Badge und vorbereiteter Mausbedienung. Cheat-Schalter starten
-ausgeschaltet. Bei macOS-Medientasten gegebenenfalls **fn** verwenden.
-**⇧** bedeutet Umschalt, **⌥** bedeutet Option/Alt.
+verborgenem Panel und Badge und vorbereiteter Mausbedienung. Cheat-Schalter starten je nach Auswahl mit den gespeicherten Einstellungen
+oder ausgeschaltet. Bei macOS-Medientasten gegebenenfalls **fn** verwenden.
+**⌃** bedeutet Control, **⇧** Umschalt, **⌥** Option/Alt und **⌘** Command.
 
 **Grün** bestätigt eine aktive Wirkung; **Orange** bedeutet eingeschaltet,
 aber noch auf passende Ausrüstung, Freischaltung oder eine Bestätigung wartend.
@@ -164,6 +183,31 @@ Tooltips erklären die jeweilige Grenze. Zahlenwert anklicken, eingeben und mit
 **Enter** übernehmen; **Esc** bricht die Eingabe ab. **GO** führt eine Aktion
 **einmalig** aus. Bei geöffnetem Panel wird die Maus freigegeben und der
 Spiel-Viewport ignoriert Bewegungs-/Schusseingaben; die Welt läuft weiter.
+
+## Konfliktprüfung der Tastatur
+
+Freie F1–F12-Belegungen bleiben erhalten. Beim Start und bei Rückkehr ins Spiel
+liest der Trainer die aktivierten systemweiten macOS-Kürzel über
+`CopySymbolicHotKeys`. Bekannte Option-F-Hardware-/Bedienungshilfen-Kürzel
+werden ebenfalls ausgespart. Die macOS-Einstellungen werden nicht verändert.
+
+Nur Konflikte erhalten kurze Ersatzbelegungen mit höchstens **einer Zusatztaste**.
+Zuerst wird dieselbe Taste mit Control, Shift oder Option geprüft. Ist dort nichts
+frei, folgt **Alt/Option + 1–0**, danach **Control + 1–0**. Mehrere gleichzeitig zu
+haltende Zusatztasten werden für Ersatzbelegungen nicht verwendet. Freie
+ursprüngliche Trainer-Tasten haben Vorrang; Ersatzbelegungen dürfen diese nicht
+übernehmen. Gibt es keinen kurzen freien Ersatz, bleibt nur dieses Tastenkürzel aus.
+Mausaktionen bleiben erreichbar.
+Die tatsächliche Zuordnung steht direkt an der jeweiligen Overlay-Zeile; die
+Einstellungen zeigen eine Liste aller Umlegungen. Die folgende Tabelle zeigt
+**Basisbelegungen**, die bei Systemkonflikten automatisch ersetzt werden.
+
+Alte konfliktbehaftete Kürzel werden nicht zusätzlich als Alias weiterverwendet.
+Eine fehlgeschlagene native Registrierung wegen bereits belegter Tasten wird
+auch nicht durch den AppKit-Ersatzpfad umgangen. Die Erkennung umfasst macOS-
+Systemkürzel; beliebige Drittanbieter-Hotkeys und app-spezifische Menübelegungen
+sind darüber nicht vollständig abfragbar. Bei nicht lesbarer Systembelegung
+meldet die Anzeige die konservative Ersatzprüfung ausdrücklich.
 
 ## Funktionen
 
@@ -225,7 +269,21 @@ versehentlich ausgeführt werden.
 Eine bestätigte Netzwerksitzung sperrt die Cheats, nimmt eigene Wirkungen zurück
 und löscht die Auswahl. Das gilt auch bei allein gestarteter Koop-Sitzung.
 Zurück im Einzelspieler muss neu aktiviert werden. Overlay, Mausbedienung und
-F12 bleiben unabhängig davon verfügbar.
+das aktuelle Alles-aus-Kürzel bleiben unabhängig davon verfügbar.
+
+## Cheat-Auswahl beim nächsten Start laden
+
+Der Schalter im Hauptfenster speichert die gewünschte Startweise. Er ist wie in
+Vorlage 1.1 zunächst eingeschaltet. Schalter und Zahlenwerte werden getrennt für
+Mac App Store und Steam gespeichert, solange der Launcher läuft. Die Auswahl
+wird erst nach erkanntem Einzelspieler angewendet. Geld setzen, Geld hinzufügen,
+Wut auffüllen und XP bis Maximallevel werden niemals automatisch ausgeführt.
+
+Ausgeschaltet startet das Spiel ohne gespeicherte Cheat-Auswahl. Die Auswahl
+im laufenden Spiel und das Wiederanwenden bei Gebietswechseln bleiben davon
+unabhängig. Ein bestätigter Netzwerkmodus löscht die angeforderten Schalter;
+auch „Cheats aus“ während des Ladens wird gespeichert. Das Overlay startet
+weiterhin verborgen. Beide Startknöpfe verwenden dieselbe gewählte Einstellung.
 
 ## Tests und Kompatibilitätsprüfung
 
@@ -234,7 +292,11 @@ Waffen- und Besitzerwechsel, tote Weak-Referenzen, numerische Grenzen,
 XP-Rückkopplung, Gebietswechsel, Warteschlange und Netzwerksperre. Launcher-Tests prüfen beide Store-Auswahlen, fehlende/laufende Installationen,
 Start-/Einstellungsaktionen und kompakte Abmessungen ohne Spielstart. UI-Tests prüfen
 Hotkeys, alle 26 Mausaktionen in verschiedenen Größen/Positionen, Zahlenfelder,
-Ziehen, Verbergen und Cursor-Wiederherstellung. Editionsprüfungen verwenden
+Ziehen, Verbergen und Cursor-Wiederherstellung. Die übernommenen Darstellungstests
+prüfen zusätzlich 1.000 verborgene/sichtbare Zustände, unabhängige Zeilenkopien,
+Änderungen im selben Zustandsobjekt, vollständige Zeilen nach nativem Layout sowie
+Material-/Kontrastwechsel zur Laufzeit. Legacy-Fallback-Tests auf einem neuen
+macOS sind keine tatsächlich ausgeführten Tests auf macOS 14/15. Editionsprüfungen verwenden
 selbst erzeugte kleine App-Fixtures; Originalspiele und Saves werden dafür nicht
 benötigt. Der Build startet kein echtes Spiel.
 
@@ -256,12 +318,12 @@ Originalsignaturen lassen sich nach dem Bauen separat prüfen, ohne Spielstart:
 "$DI2_TRAINER_BUILD_DIR/Dead Island 2 Trainer.app/Contents/MacOS/Trainer" --validate-only steam
 ```
 
-Für Version 0.6.5 sind Build, Signatur, synthetische Tests, Launcher-Darstellung
+Für Version 0.6.10 sind Build, Signatur, synthetische Tests, Launcher-Darstellung
 und der lesende MAS-ABI-Abgleich geprüft. Verborgener Sitzungsstart trotz alter
 Anzeigeoptionen und automatische Mausbedienung beim Öffnen/Wiederöffnen sind
 synthetisch geprüft. Die getrennten Startknöpfe wurden mit
 Testaktionen ohne Spielstart geprüft. Der Steam-ABI-Abgleich war für Version
-0.6.3 erfolgreich; für 0.6.5 wurde er mangels erreichbarer Installation nicht
+0.6.3 erfolgreich; für 0.6.10 wurde er mangels erreichbarer Installation nicht
 wiederholt. Steam-Betrieb einschließlich Waffenfunktionen sowie Mausbedienung wurden
 vom Nutzer als funktionierend gemeldet. Es liegt weiterhin keine vollständige
 Ingame-Testmatrix für alle 26 Funktionen, Gebiete, Waffenarten, langen Sitzungen,
@@ -273,6 +335,7 @@ Koop-Übergänge und iCloud-Synchronisierung vor.
 | --- | --- |
 | `Sources/Launcher.m`, `Sources/LauncherView.*` | Editionswahl, kompakter Launcher, Einstellungen, Originalprüfung und Spielstart |
 | `Sources/Runtime.m` | Prozessbegrenzung, Fenster- und Ereignisanbindung |
+| `Sources/TrainerMaterial.*`, `docs/UI.md` | Gemeinsame Glas-/Vibrancy-/Kontrast-Flächen und Skalierungsregeln |
 | `Sources/Overlay*` | Panel, Maus/Tasten, Anzeigeoptionen und Cursor-Modus |
 | `Sources/TrainerFeatures.*` | Gemeinsamer Funktions- und Tastenkatalog |
 | `Sources/GameAccess.*` | Versionsgebundene native Anbindungen und begrenzte Datenzugriffe |

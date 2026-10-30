@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #import "Overlay.h"
+#import "TrainerMaterial.h"
 #import <QuartzCore/QuartzCore.h>
 #include <math.h>
 
@@ -23,14 +24,44 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
 - (void)beginDraggingAt:(NSPoint)point;
 - (void)dragTo:(NSPoint)point;
 - (void)endDragging;
+- (void)refreshPresentation;
 @end
 @interface DI2FeatureRow : NSView
 @property(nonatomic) DI2Feature feature;
 @property(nonatomic, weak) DI2OverlayRoot *owner;
 @property(nonatomic, strong) DI2FeatureState *state;
 @property(nonatomic) BOOL ready;
+- (void)updateState:(DI2FeatureState *)state ready:(BOOL)ready;
+- (void)invalidateShortcutPresentation;
 @end
-@implementation DI2FeatureRow
+@implementation DI2FeatureRow {
+    BOOL _hasPresentation;
+}
+- (void)invalidateShortcutPresentation { _hasPresentation=NO; }
+- (void)updateState:(DI2FeatureState *)state ready:(BOOL)ready {
+    DI2FeatureState *old=self.state;
+    BOOL noteChanged=!(old.note==state.note || [old.note isEqualToString:state.note]);
+    BOOL changed=!_hasPresentation || self.ready!=ready || old.available!=state.available
+        || old.wanted!=state.wanted || old.active!=state.active || old.value!=state.value || noteChanged;
+    if(!changed)return;
+    BOOL accessibilityChanged=!_hasPresentation || self.ready!=ready
+        || old.wanted!=state.wanted || old.active!=state.active;
+    const DI2FeatureInfo *info=DI2FeatureInfoAt(self.feature);
+    if(!_hasPresentation || noteChanged)
+        self.toolTip=[NSString stringWithFormat:@"%@ (%@)\n%@",info->title,DI2HotkeyAt(self.feature).label,state.note ?: info->detail];
+    // Copy only presentation values, never retain a mutable bridge object as
+    // the row's previous-state comparison. Hidden updates retain only _state.
+    DI2FeatureState *snapshot=[DI2FeatureState new];
+    snapshot.available=state.available;snapshot.wanted=state.wanted;snapshot.active=state.active;
+    snapshot.value=state.value;snapshot.note=state.note;
+    self.state=snapshot;self.ready=ready;_hasPresentation=YES;
+    if(accessibilityChanged) {
+        self.accessibilityLabel=[NSString stringWithFormat:@"%@ · %@ · %@",info->title,DI2HotkeyAt(self.feature).label,
+            !info->implemented ? @"nicht verfügbar" : state.active ? @"an" : state.wanted ? @"wartet" : @"aus"];
+        self.accessibilityValue=@(state.wanted); self.accessibilityEnabled=ready && info->implemented;
+    }
+    [self setNeedsDisplay:YES];
+}
 - (void)resetCursorRects {
     [super resetCursorRects]; if (self.owner.wantsMouseInteraction) [self addCursorRect:self.bounds cursor:NSCursor.arrowCursor];
 }
@@ -55,8 +86,8 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
     CGFloat value=width-(self.feature==DI2FeatureMoney ? 105 : 85), valueWidth=self.feature==DI2FeatureMoney ? 63 : 43;
     if (self.feature%2==0) { [[NSColor colorWithWhite:1 alpha:0.025] setFill]; NSRectFillUsingOperation(self.bounds,NSCompositingOperationSourceOver); }
     NSColor *color=info->implemented ? (self.ready ? NSColor.whiteColor : [NSColor colorWithWhite:0.55 alpha:1]) : [NSColor colorWithWhite:0.4 alpha:1];
-    label(info->shortcut,NSMakeRect(3,4,33,15),8.5,[NSColor colorWithWhite:0.58 alpha:1],NO,NO);
-    label(info->title,NSMakeRect(37,3,(info->numeric ? value-48 : toggle-42),16),10,color,NO,NO);
+    label(DI2HotkeyAt(self.feature).label,NSMakeRect(3,4,56,15),8,[NSColor colorWithWhite:0.78 alpha:1],NO,NO);
+    label(info->title,NSMakeRect(60,3,(info->numeric ? value-71 : toggle-65),16),10,color,NO,NO);
     if (info->numeric) {
         label(@"−",NSMakeRect(value-11,2,12,16),11,orange(),YES,NO);
         label(number(self.state.value,self.feature==DI2FeatureMoney),NSMakeRect(value,4,valueWidth,15),9.5,orange(),NO,NO);
@@ -117,13 +148,14 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
 - (void)drawRect:(NSRect)dirty {
     (void)dirty; [[NSColor colorWithWhite:0.08 alpha:0.93] setFill];
     [[NSBezierPath bezierPathWithRoundedRect:self.bounds xRadius:5 yRadius:5] fill];
-    label(@"DI2 · ⌘ ^",NSMakeRect(8,4,82,16),10,orange(),YES,NO);
+    label([@"DI2 · " stringByAppendingString:DI2HotkeyAt(DI2HotkeyPanel).label],NSMakeRect(8,4,82,16),9,orange(),YES,NO);
 }
 - (void)mouseDown:(NSEvent *)event { (void)event; [self.owner togglePanel:nil]; }
 - (BOOL)accessibilityPerformPress { dispatch_async(dispatch_get_main_queue(),^{ [self.owner togglePanel:nil]; }); return YES; }
 @end
 @implementation DI2OverlayRoot {
     DI2OverlaySurface *_panel;
+    DI2TrainerMaterial *_material;
     DI2OverlayBadge *_badge;
     NSArray<DI2FeatureRow *> *_rows;
     DI2TrainerState *_state;
@@ -136,11 +168,16 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
     __weak NSView *_mouseTarget;
     BOOL _mouseSequence;
     NSPoint _dragStart, _dragOrigin;
+    NSString *_lastStatus, *_lastDetail;
+    NSNumber *_lastCash;
+    NSUInteger _lastActiveCount;
+    BOOL _hasPresentation, _lastMouseActive;
 }
 - (BOOL)isFlipped { return YES; }
 - (BOOL)isOpaque { return NO; }
 - (BOOL)acceptsFirstResponder { return NO; }
-- (NSView *)panel { return _panel; }
+- (NSView *)panel { return _material; }
+- (NSView *)panelContent { return _panel; }
 - (NSView *)badge { return _badge; }
 - (instancetype)initWithFrame:(NSRect)frame version:(NSString *)version {
     if (!(self=[super initWithFrame:frame])) return nil;
@@ -148,14 +185,16 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
     self.identifier=@"DI2TrainerOverlay"; self.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;
     self.wantsLayer=YES; self.layer.backgroundColor=NSColor.clearColor.CGColor; self.layer.zPosition=100000;
     self.accessibilityElement=YES; self.accessibilityRole=NSAccessibilityGroupRole;
-    self.accessibilityLabel=@"Dead Island 2 Trainer. Befehl und Zirkumflex: Overlay. F12: alle Schalter aus.";
+    self.accessibilityLabel=[NSString stringWithFormat:@"Dead Island 2 Trainer. %@: Overlay. %@: alle Schalter aus.",DI2HotkeyAt(DI2HotkeyPanel).label,DI2HotkeyAt(DI2HotkeyDisableAll).label];
     _panel=[[DI2OverlaySurface alloc] initWithFrame:NSZeroRect]; _panel.owner=self; _panel.wantsLayer=YES;
-    _panel.toolTip=@"Titelleiste ziehen: Overlay verschieben. ⌘ + ^: verbergen/anzeigen; Cheats bleiben aktiv.";
-    [self addSubview:_panel];
+    _panel.toolTip=@"Titelleiste ziehen: Overlay verschieben. Beim Verbergen bleiben Cheats aktiv.";
+    _material=[[DI2TrainerMaterial alloc]initWithContentView:_panel cornerRadius:14];
+    _material.appearance=[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+    [self addSubview:_material];
     NSMutableArray *rows=[NSMutableArray new];
     for (NSInteger i=0;i<DI2FeatureCount;i++) {
-        DI2FeatureRow *row=[[DI2FeatureRow alloc] initWithFrame:NSZeroRect]; row.feature=i; row.owner=self;
-        row.toolTip=[NSString stringWithFormat:@"%@ (%@)\n%@",DI2FeatureInfoAt(i)->title,DI2FeatureInfoAt(i)->shortcut,DI2FeatureInfoAt(i)->detail];
+        DI2FeatureRow *row=[[DI2FeatureRow alloc] initWithFrame:NSMakeRect(8+(i/13)*266,48+(i%13)*21,258,20)]; row.feature=i; row.owner=self;
+        row.toolTip=[NSString stringWithFormat:@"%@ (%@)\n%@",DI2FeatureInfoAt(i)->title,DI2HotkeyAt(i).label,DI2FeatureInfoAt(i)->detail];
         [_panel addSubview:row]; [rows addObject:row];
     }
     _rows=rows;
@@ -175,17 +214,16 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
         unit.y=[position hasPrefix:@"bottom"] ? 1 : [position isEqualToString:@"center"] ? 0.5 : 0;
     }
     CGFloat availableX=MAX(0,self.bounds.size.width-2*margin-540*scale),availableY=MAX(0,self.bounds.size.height-2*margin-height*scale);
-    _panel.frame=NSMakeRect(margin+unit.x*availableX,margin+unit.y*availableY,540*scale,height*scale);
-    _panel.bounds=NSMakeRect(0,0,540,height);
+    _material.frame=NSMakeRect(margin+unit.x*availableX,margin+unit.y*availableY,540*scale,height*scale);
+    _material.bounds=NSMakeRect(0,0,NSWidth(_material.frame),NSHeight(_material.frame));
+    _material.logicalContentSize=NSMakeSize(540,height);[_material layout];
     for (NSInteger i=0;i<DI2FeatureCount;i++) {
-        _rows[i].frame=NSMakeRect(8+(i/13)*266,48+(i%13)*21,258,20); _rows[i].hidden=_folded;
+        if(_rows[i].hidden!=_folded)_rows[i].hidden=_folded;
     }
     _badge.frame=NSMakeRect(margin+unit.x*MAX(0,self.bounds.size.width-2*margin-96),margin+unit.y*MAX(0,self.bounds.size.height-2*margin-24),96,24);
 }
 - (void)drawPanel:(NSRect)bounds {
-    [[NSColor colorWithRed:0.075 green:0.08 blue:0.085 alpha:0.96] setFill];
-    NSBezierPath *border=[NSBezierPath bezierPathWithRoundedRect:NSInsetRect(bounds,0.5,0.5) xRadius:7 yRadius:7];
-    [border fill]; [orange() setStroke]; [border stroke];
+    (void)bounds; // The shared native material owns the background and edge.
     label(@"DEAD ISLAND 2",NSMakeRect(10,7,112,18),12,orange(),YES,NO);
     label(@"TRAINER",NSMakeRect(126,9,55,14),9,NSColor.whiteColor,YES,NO);
     label(@"−",NSMakeRect(438,6,18,19),13,NSColor.whiteColor,YES,NO);
@@ -193,8 +231,8 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
     label(_folded ? @"▸" : @"▾",NSMakeRect(493,6,18,19),13,NSColor.whiteColor,YES,NO);
     label(@"×",NSMakeRect(519,6,18,19),13,NSColor.whiteColor,YES,NO);
     NSUInteger active=0; for (DI2FeatureState *feature in _state.features) if (feature.active) active++;
-    NSString *summary=[NSString stringWithFormat:@"%@ · %@ · %lu aktiv · Geld %@   |   F4 +1.000 · F5 +10.000 · F12 alles aus",_gameVersion,_state.status,(unsigned long)active,_state.cash ?: @"—"];
-    label(summary,NSMakeRect(10,27,520,15),9,[NSColor colorWithWhite:0.67 alpha:1],NO,NO);
+    NSString *summary=[NSString stringWithFormat:@"%@ · %@ · %lu aktiv · Geld %@ | %@ +1.000 · %@ +10.000 · %@ aus",_gameVersion,_state.status,(unsigned long)active,_state.cash ?: @"—",DI2HotkeyAt(DI2HotkeyCash1000).label,DI2HotkeyAt(DI2HotkeyCash10000).label,DI2HotkeyAt(DI2HotkeyDisableAll).label];
+    label(summary,NSMakeRect(10,27,520,15),9,[NSColor colorWithWhite:0.82 alpha:1],NO,NO);
     if (_folded) return;
     [[NSColor colorWithWhite:1 alpha:0.1] setFill]; NSRectFillUsingOperation(NSMakeRect(270,47,0.5,272),NSCompositingOperationSourceOver);
     if (_editingFeature>=0) {
@@ -204,7 +242,7 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
         label(detail ?: @"",NSMakeRect(10,326,520,27),9.5,[NSColor colorWithWhite:0.79 alpha:1],NO,YES);
     }
     NSString *mouseState=!self.wantsMouseInteraction ? @"Spiel" : _state.overlayMouseActive ? @"frei" : @"wartet";
-    label([NSString stringWithFormat:@"⌘ ^ Overlay · ⌘⌥ ^ Maus %@ · Esc schließen · Titelleiste ziehen · v0.6.5",mouseState],NSMakeRect(10,354,520,12),8,[NSColor colorWithWhite:0.5 alpha:1],NO,NO);
+    label([NSString stringWithFormat:@"%@ Overlay · %@ Maus %@ · Esc schließen · Titelleiste ziehen · v0.6.9",DI2HotkeyAt(DI2HotkeyPanel).label,DI2HotkeyAt(DI2HotkeyMouse).label,mouseState],NSMakeRect(10,354,520,12),8,[NSColor colorWithWhite:0.78 alpha:1],NO,NO);
 }
 - (void)headerClick:(NSPoint)point {
     if (point.y>25) return;
@@ -215,8 +253,9 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
     [_panel setNeedsDisplay:YES];
 }
 - (void)setPanelVisible:(BOOL)visible {
-    _panelVisible=visible; _panel.hidden=!visible; _badge.hidden=visible || ![_options[@"badge"] boolValue];
+    _panelVisible=visible; _material.hidden=!visible; _badge.hidden=visible || ![_options[@"badge"] boolValue];
     if (!visible) { _editingFeature=-1; _dragging=NO; }
+    else {[self refreshPresentation];[_panel setNeedsDisplay:YES];}
     [self setNeedsDisplay:YES];
     [self.window invalidateCursorRectsForView:_panel];
 }
@@ -249,7 +288,7 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
 }
 - (void)beginDraggingAt:(NSPoint)point {
     _dragging=self.panelVisible && [_options[@"draggable"] boolValue]; _dragMoved=NO;
-    _dragStart=point; _dragOrigin=_panel.frame.origin;
+    _dragStart=point; _dragOrigin=_material.frame.origin;
 }
 - (void)dragTo:(NSPoint)point {
     if (!_dragging) return;
@@ -257,8 +296,8 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
     if (!_dragMoved && fabs(dx)+fabs(dy)<3) return;
     _dragMoved=YES;
     CGFloat margin=MIN(12,MAX(0,MIN(self.bounds.size.width,self.bounds.size.height)*0.1));
-    CGFloat width=MAX(0,self.bounds.size.width-2*margin-_panel.frame.size.width);
-    CGFloat height=MAX(0,self.bounds.size.height-2*margin-_panel.frame.size.height);
+    CGFloat width=MAX(0,self.bounds.size.width-2*margin-_material.frame.size.width);
+    CGFloat height=MAX(0,self.bounds.size.height-2*margin-_material.frame.size.height);
     NSMutableDictionary *options=[self.overlayOptions mutableCopy]; options[@"position"]=@"free";
     options[@"x"]=@(width>0 ? MIN(1,MAX(0,(_dragOrigin.x+dx-margin)/width)) : 0);
     options[@"y"]=@(height>0 ? MIN(1,MAX(0,(_dragOrigin.y+dy-margin)/height)) : 0);
@@ -270,15 +309,34 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
 }
 - (void)updateState:(DI2TrainerState *)state {
     _state=state;
+    if(self.panelVisible)[self refreshPresentation];
+}
+- (void)refreshPresentation {
+    if(!_state)return;
+    DI2TrainerState *state=_state;
+    NSUInteger active=0;
     for (NSInteger i=0;i<DI2FeatureCount;i++) {
-        DI2FeatureRow *row=_rows[i]; row.state=state.features[i]; row.ready=state.ready;
-        row.accessibilityLabel=[NSString stringWithFormat:@"%@ · %@ · %@",DI2FeatureInfoAt(i)->title,DI2FeatureInfoAt(i)->shortcut,!DI2FeatureInfoAt(i)->implemented ? @"nicht verfügbar" : row.state.active ? @"an" : row.state.wanted ? @"wartet" : @"aus"];
-        row.accessibilityValue=@(row.state.wanted); row.accessibilityEnabled=state.ready && DI2FeatureInfoAt(i)->implemented;
-        [row setNeedsDisplay:YES];
+        [_rows[i] updateState:state.features[i] ready:state.ready];
+        if(state.features[i].active)active++;
     }
-    [_panel setNeedsDisplay:YES];
+    NSString *status=state.status ?: @"", *detail=(_hover>=0 ? state.features[_hover].note : state.message) ?: @"";
+    if(!_hasPresentation || ![_lastStatus isEqual:status] || ![_lastDetail isEqual:detail]
+        || !(_lastCash==state.cash || [_lastCash isEqual:state.cash])
+        || _lastActiveCount!=active || _lastMouseActive!=state.overlayMouseActive) {
+        _hasPresentation=YES; _lastStatus=[status copy]; _lastDetail=[detail copy];
+        _lastCash=[state.cash copy]; _lastActiveCount=active; _lastMouseActive=state.overlayMouseActive;
+        [_panel setNeedsDisplay:YES];
+    }
 }
 - (void)hoverFeature:(DI2Feature)feature { _hover=feature; [_panel setNeedsDisplay:YES]; }
+- (void)refreshHotkeyLabels {
+    for(NSInteger i=0;i<DI2FeatureCount;i++) {
+        _rows[i].toolTip=[NSString stringWithFormat:@"%@ (%@)\n%@",DI2FeatureInfoAt(i)->title,DI2HotkeyAt(i).label,DI2FeatureInfoAt(i)->detail];
+        [_rows[i] invalidateShortcutPresentation];
+    }
+    self.accessibilityLabel=[NSString stringWithFormat:@"Dead Island 2 Trainer. %@: Overlay. %@: alle Schalter aus.",DI2HotkeyAt(DI2HotkeyPanel).label,DI2HotkeyAt(DI2HotkeyDisableAll).label];
+    [self updateState:_state];[_panel setNeedsDisplay:YES];[_badge setNeedsDisplay:YES];
+}
 - (void)activateFeature:(DI2Feature)feature {
     const DI2FeatureInfo *info=DI2FeatureInfoAt(feature);
     if (!_state.ready || !info || !info->implemented) return;
@@ -303,38 +361,41 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
     if (DI2OverlayToggleEvent(event)) { [self togglePanel:nil]; return YES; }
     if (event.type!=NSEventTypeKeyDown) return NO;
     if (!event.isARepeat && DI2ShortcutForEvent(event)==DI2ShortcutMouse) { [self toggleMouseInteraction]; return YES; }
-    if (event.keyCode==53 && _editingFeature<0 && self.wantsMouseInteraction) {
+    NSEventModifierFlags flags=event.modifierFlags&DI2HotkeyModifierMask();
+    NSInteger hotkey=DI2HotkeyForEvent(event);
+    if(!event.isARepeat && hotkey==DI2HotkeyDisableAll) {
+        _editingFeature=-1;
+        if(self.actionHandler)self.actionHandler(DI2TrainerDisableAll);
+        [_panel setNeedsDisplay:YES];return YES;
+    }
+    if (event.keyCode==53 && !flags && _editingFeature<0 && self.wantsMouseInteraction) {
         self.panelVisible=NO; [self notifyOptionsChanged]; return YES;
     }
     if (_editingFeature>=0) {
-        if (event.keyCode==53) _editingFeature=-1;
-        else if (event.keyCode==36 || event.keyCode==76) {
+        if (event.keyCode==53 && !flags) _editingFeature=-1;
+        else if ((event.keyCode==36 || event.keyCode==76) && !flags) {
             NSScanner *scanner=[NSScanner scannerWithString:[_editText stringByReplacingOccurrencesOfString:@"," withString:@"."]];
             scanner.locale=[NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
             double value=0; const DI2FeatureInfo *info=DI2FeatureInfoAt(_editingFeature);
             if ([scanner scanDouble:&value] && scanner.isAtEnd && isfinite(value) && value>=info->minimum && value<=info->maximum && (_editingFeature!=DI2FeatureMoney || floor(value)==value)) {
                 if (self.valueHandler) self.valueHandler(_editingFeature,value); _editingFeature=-1;
             }
-        } else if ((event.modifierFlags & NSEventModifierFlagCommand) && event.keyCode==0) _selectAll=YES;
-        else if (event.keyCode==51) { _editText=_selectAll ? @"" : [_editText substringToIndex:_editText.length ? _editText.length-1 : 0]; _selectAll=NO; }
+        } else if (flags==NSEventModifierFlagCommand && event.keyCode==0) _selectAll=YES;
+        else if (event.keyCode==51 && !flags) { _editText=_selectAll ? @"" : [_editText substringToIndex:_editText.length ? _editText.length-1 : 0]; _selectAll=NO; }
         else if (!(event.modifierFlags & (NSEventModifierFlagCommand|NSEventModifierFlagControl|NSEventModifierFlagOption))) {
             NSString *characters=event.charactersIgnoringModifiers ?: @"";
             if (characters.length && [characters rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"0123456789.,"].invertedSet].location==NSNotFound && _editText.length<16) {
                 _editText=_selectAll ? characters : [_editText stringByAppendingString:characters]; _selectAll=NO;
-            }
-        }
+            } else return NO;
+        } else return NO;
         [_panel setNeedsDisplay:YES]; return YES;
     }
-    if (event.isARepeat || (event.modifierFlags & (NSEventModifierFlagCommand|NSEventModifierFlagControl))) return NO;
-    NSUInteger modifiers=((event.modifierFlags & NSEventModifierFlagShift) ? 1 : 0) | ((event.modifierFlags & NSEventModifierFlagOption) ? 2 : 0);
-    if (!modifiers && (event.keyCode==118 || event.keyCode==96 || event.keyCode==111)) {
-        if ((_state.ready || event.keyCode==111) && self.actionHandler) self.actionHandler(event.keyCode==118 ? DI2TrainerCash1000 : event.keyCode==96 ? DI2TrainerCash10000 : DI2TrainerDisableAll);
+    if (event.isARepeat)return NO;
+    if (hotkey==DI2HotkeyCash1000 || hotkey==DI2HotkeyCash10000 || hotkey==DI2HotkeyDisableAll) {
+        if ((_state.ready || hotkey==DI2HotkeyDisableAll) && self.actionHandler) self.actionHandler(hotkey==DI2HotkeyCash1000 ? DI2TrainerCash1000 : hotkey==DI2HotkeyCash10000 ? DI2TrainerCash10000 : DI2TrainerDisableAll);
         return YES;
     }
-    for (NSInteger i=0;i<DI2FeatureCount;i++) {
-        const DI2FeatureInfo *info=DI2FeatureInfoAt(i);
-        if (event.keyCode==info->key && modifiers==info->modifiers) { [self activateFeature:i]; return YES; }
-    }
+    if(hotkey>=0 && hotkey<DI2FeatureCount) { [self activateFeature:hotkey];return YES; }
     return NO;
 }
 - (BOOL)handleMouseEvent:(NSEvent *)event {
@@ -342,7 +403,7 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
     if (event.type==NSEventTypeLeftMouseDown) {
         _mouseTarget=nil; _mouseSequence=NO;
         NSPoint point=[self convertPoint:event.locationInWindow fromView:nil];
-        NSView *target=self.wantsMouseInteraction ? [_panel hitTest:point] : nil;
+        NSView *target=self.wantsMouseInteraction ? [_material hitTest:point] : nil;
         if (!target && !_badge.hidden) target=[_badge hitTest:point];
         if (!target) return NO;
         _mouseTarget=target; _mouseSequence=YES;
@@ -363,7 +424,7 @@ static NSString *number(double value, BOOL integer) { return integer ? [NSString
 }
 - (NSView *)hitTest:(NSPoint)point {
     NSView *hit=[super hitTest:point];
-    if (hit==self || (!self.wantsMouseInteraction && [hit isDescendantOf:_panel])) return nil;
+    if (hit==self || (!self.wantsMouseInteraction && [hit isDescendantOf:_material])) return nil;
     return hit;
 }
 @end

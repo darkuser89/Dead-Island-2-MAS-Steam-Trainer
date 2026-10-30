@@ -29,9 +29,9 @@ TEST="$STAGE/Trainer Test.app"
 mkdir -p "$CANDIDATE/Contents/MacOS" "$CANDIDATE/Contents/Resources" "$TEST/Contents/MacOS"
 FLAGS=(-arch arm64 -mmacosx-version-min=14.0 -fobjc-arc -O1 -Wall -Wextra -Werror "-ffile-prefix-map=$ROOT=." -I"$ROOT/Sources")
 xcrun clang "${FLAGS[@]}" -dynamiclib -framework Carbon -framework AppKit -framework QuartzCore \
-    "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" "$ROOT/Sources/Runtime.m" -install_name @rpath/TrainerOverlay.dylib -o "$CANDIDATE/Contents/Resources/TrainerOverlay.dylib"
+    "$ROOT/Sources/TrainerMaterial.m" "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/SelectionSettings.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" "$ROOT/Sources/Runtime.m" -install_name @rpath/TrainerOverlay.dylib -o "$CANDIDATE/Contents/Resources/TrainerOverlay.dylib"
 codesign --force --sign - --timestamp=none "$CANDIDATE/Contents/Resources/TrainerOverlay.dylib"
-xcrun clang "${FLAGS[@]}" -framework AppKit -framework Security -framework UniformTypeIdentifiers "$ROOT/Sources/Launcher.m" "$ROOT/Sources/LauncherView.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/GameEdition.m" -o "$CANDIDATE/Contents/MacOS/Trainer"
+xcrun clang "${FLAGS[@]}" -framework Carbon -framework AppKit -framework Security -framework UniformTypeIdentifiers "$ROOT/Sources/Launcher.m" "$ROOT/Sources/LauncherView.m" "$ROOT/Sources/TrainerMaterial.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/SelectionSettings.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/GameEdition.m" -o "$CANDIDATE/Contents/MacOS/Trainer"
 cp "$ROOT/Resources/Info.plist" "$CANDIDATE/Contents/Info.plist"
 cp "$ROOT/LICENSE" "$CANDIDATE/Contents/Resources/LICENSE"
 ICONSET="$STAGE/AppIcon.iconset"
@@ -43,11 +43,14 @@ done
 iconutil --convert icns "$ICONSET" --output "$CANDIDATE/Contents/Resources/AppIcon.icns"
 codesign --force --sign - --options runtime --timestamp=none "$CANDIDATE"
 codesign --verify --deep --strict "$CANDIDATE"
-xcrun clang "${FLAGS[@]}" -framework AppKit -framework QuartzCore \
-    "$ROOT/Tests/LauncherViewTests.m" "$ROOT/Sources/LauncherView.m" "$ROOT/Sources/GameEdition.m" -o "$STAGE/LauncherViewTests"
+xcrun clang "${FLAGS[@]}" -framework Carbon -framework AppKit -framework QuartzCore \
+    "$ROOT/Tests/LauncherViewTests.m" "$ROOT/Sources/LauncherView.m" "$ROOT/Sources/TrainerMaterial.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/SelectionSettings.m" "$ROOT/Sources/GameEdition.m" -o "$STAGE/LauncherViewTests"
 "$STAGE/LauncherViewTests" "$STAGE/LauncherPreview.png" "$CANDIDATE/Contents/Resources/AppIcon.icns"
-xcrun clang "${FLAGS[@]}" -framework AppKit -framework Metal -framework QuartzCore \
-    "$ROOT/Tests/MetalHost.m" "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" -o "$TEST/Contents/MacOS/TrainerTestHost"
+xcrun clang "${FLAGS[@]}" -framework Carbon -framework AppKit \
+    "$ROOT/Tests/HotkeyTests.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/SelectionSettings.m" -o "$STAGE/HotkeyTests"
+"$STAGE/HotkeyTests"
+xcrun clang "${FLAGS[@]}" -framework Carbon -framework AppKit -framework Metal -framework QuartzCore \
+    "$ROOT/Tests/MetalHost.m" "$ROOT/Tests/PresentationTests.m" "$ROOT/Sources/TrainerMaterial.m" "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/SelectionSettings.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" -o "$TEST/Contents/MacOS/TrainerTestHost"
 python3 - "$TEST/Contents/Info.plist" "$ROOT/Resources/Info.plist" <<'PY'
 import plistlib,sys
 from pathlib import Path
@@ -55,12 +58,12 @@ version=plistlib.loads(Path(sys.argv[2]).read_bytes())['CFBundleShortVersionStri
 Path(sys.argv[1]).write_bytes(plistlib.dumps({'CFBundleIdentifier':'local.deadisland2.trainer-test','CFBundleExecutable':'TrainerTestHost','CFBundleName':'Trainer Overlay Metal-Test','CFBundlePackageType':'APPL','CFBundleShortVersionString':version,'LSMinimumSystemVersion':'14.0','NSPrincipalClass':'NSApplication','NSHighResolutionCapable':True}))
 PY
 xcrun clang "${FLAGS[@]}" -DDI2_OVERLAY_TEST=1 -dynamiclib -framework Carbon -framework AppKit -framework QuartzCore \
-    "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" "$ROOT/Sources/Runtime.m" -install_name @rpath/TestOverlay.dylib -o "$STAGE/TestOverlay.dylib"
+    "$ROOT/Sources/TrainerMaterial.m" "$ROOT/Sources/Overlay.m" "$ROOT/Sources/OverlaySettings.m" "$ROOT/Sources/OverlayShortcuts.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/SelectionSettings.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" "$ROOT/Sources/Runtime.m" -install_name @rpath/TestOverlay.dylib -o "$STAGE/TestOverlay.dylib"
 codesign --force --sign - --timestamp=none "$STAGE/TestOverlay.dylib"
 codesign --force --sign - --timestamp=none "$TEST"
 "$TEST/Contents/MacOS/TrainerTestHost" --unit-test
 xcrun clang "${FLAGS[@]}" -DDI2_TRAINER_TESTING=1 -framework Foundation \
-    "$ROOT/Tests/GameBridgeTests.m" "$ROOT/Tests/ExtraFeaturesTests.m" "$ROOT/Tests/OverlayInputTests.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" -o "$STAGE/GameBridgeTests"
+    "$ROOT/Tests/GameBridgeTests.m" "$ROOT/Tests/SelectionSettingsTests.m" "$ROOT/Tests/ExtraFeaturesTests.m" "$ROOT/Tests/OverlayInputTests.m" "$ROOT/Sources/TrainerFeatures.m" "$ROOT/Sources/SelectionSettings.m" "$ROOT/Sources/GameBridge.m" "$ROOT/Sources/OverlayInput.m" "$ROOT/Sources/GameAccess.m" "$ROOT/Sources/GameEdition.m" "$ROOT/Sources/ExtraFeatures.m" -o "$STAGE/GameBridgeTests"
 "$STAGE/GameBridgeTests"
 xcrun clang "${FLAGS[@]}" -framework Foundation "$ROOT/Tests/GameEditionTests.m" "$ROOT/Sources/GameEdition.m" -o "$STAGE/GameEditionTests"
 "$STAGE/GameEditionTests"

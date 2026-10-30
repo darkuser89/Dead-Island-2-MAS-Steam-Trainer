@@ -6,7 +6,8 @@
 
 @interface DI2OverlayRoot : NSView
 @property(nonatomic) BOOL panelVisible;
-@property(nonatomic, readonly) NSView *panel;
+// panel is the physical material surface; panelContent uses logical coordinates.
+@property(nonatomic, readonly) NSView *panel, *panelContent;
 @property(nonatomic, readonly) NSView *badge;
 @property(nonatomic, copy) void (^actionHandler)(DI2TrainerAction);
 @property(nonatomic, copy) void (^featureHandler)(DI2Feature);
@@ -21,6 +22,7 @@
 - (BOOL)handleEvent:(NSEvent *)event;
 - (BOOL)handleMouseEvent:(NSEvent *)event;
 - (void)toggleMouseInteraction;
+- (void)refreshHotkeyLabels;
 @end
 
 BOOL DI2OverlayToggleEvent(NSEvent *event);
